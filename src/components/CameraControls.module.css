@@ -1,0 +1,81 @@
+.camera-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 720px;
+  margin: 20px auto;
+}
+
+.camera-error {
+  background: #fee;
+  border: 1px solid #f00;
+  color: #c00;
+  padding: 12px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.camera-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.camera-button {
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: #0066cc;
+  color: white;
+  transition: all 0.2s ease;
+  flex: 1;
+  min-width: 150px;
+}
+
+.camera-button:hover:not(:disabled) {
+  background: #0052a3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.camera-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.camera-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.camera-button.active {
+  background: #00cc00;
+}
+
+.camera-button.active:hover {
+  background: #00aa00;
+}
+
+.camera-button.switch-button {
+  background: #666;
+}
+
+.camera-button.switch-button:hover:not(:disabled) {
+  background: #555;
+}
+
+@media (max-width: 480px) {
+  .camera-button {
+    min-width: 100%;
+  }
+
+  .camera-buttons {
+    flex-direction: column;
+  }
+}
