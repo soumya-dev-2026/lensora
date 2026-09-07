@@ -43,7 +43,10 @@ export interface CameraState {
   error: string | null;
 }
 
+export type CanvasLayout = 'portrait' | 'landscape';
+
 export interface CameraPreviewProps {
+  layout: CanvasLayout;
   videoRef: React.RefObject<HTMLVideoElement>;
   canvasRef: React.RefObject<HTMLCanvasElement>;
   isActive: boolean;

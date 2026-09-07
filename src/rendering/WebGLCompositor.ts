@@ -12,6 +12,8 @@ uniform sampler2D u_camera;
 uniform sampler2D u_mask;
 uniform sampler2D u_background;
 uniform bool u_mirror;
+uniform vec2 u_cameraScale;
+uniform vec2 u_backgroundScale;
 uniform vec2 u_maskTexel;
 uniform vec2 u_backgroundTexel;
 in vec2 v_uv;
@@ -50,9 +52,10 @@ float noise(vec2 point) {
 }
 
 void main() {
-  vec2 cameraUv = u_mirror ? vec2(1.0 - v_uv.x, v_uv.y) : v_uv;
+  vec2 cameraUv = (v_uv - 0.5) * u_cameraScale + 0.5;
+  if (u_mirror) cameraUv.x = 1.0 - cameraUv.x;
   vec4 foreground = texture(u_camera, cameraUv);
-  vec3 background = blurredBackground(v_uv);
+  vec3 background = blurredBackground((v_uv - 0.5) * u_backgroundScale + 0.5);
   float rawMask = personMask(cameraUv);
   float alpha = smoothstep(0.18, 0.78, rawMask);
 
@@ -88,6 +91,9 @@ export class WebGLCompositor {
   private cameraTexture: WebGLTexture;
   private maskTexture: WebGLTexture;
   private backgroundTexture: WebGLTexture;
+  private backgroundAspect = 1;
+  private cameraScaleLocation: WebGLUniformLocation | null;
+  private backgroundScaleLocation: WebGLUniformLocation | null;
   private mirrorLocation: WebGLUniformLocation | null;
   private maskTexelLocation: WebGLUniformLocation | null;
   private backgroundTexelLocation: WebGLUniformLocation | null;
@@ -118,6 +124,8 @@ export class WebGLCompositor {
     this.cameraTexture = this.createTexture(0, 'u_camera');
     this.maskTexture = this.createTexture(1, 'u_mask');
     this.backgroundTexture = this.createTexture(2, 'u_background');
+    this.cameraScaleLocation = gl.getUniformLocation(program, 'u_cameraScale');
+    this.backgroundScaleLocation = gl.getUniformLocation(program, 'u_backgroundScale');
     this.mirrorLocation = gl.getUniformLocation(program, 'u_mirror');
     this.maskTexelLocation = gl.getUniformLocation(program, 'u_maskTexel');
     this.backgroundTexelLocation = gl.getUniformLocation(program, 'u_backgroundTexel');
@@ -138,6 +146,7 @@ export class WebGLCompositor {
   }
 
   setBackground(image: HTMLImageElement): void {
+    this.backgroundAspect = image.naturalWidth / image.naturalHeight;
     const { gl } = this;
     gl.activeTexture(gl.TEXTURE2);
     gl.bindTexture(gl.TEXTURE_2D, this.backgroundTexture);
@@ -148,6 +157,7 @@ export class WebGLCompositor {
   }
 
   setBackgroundColor(hex: string): void {
+    this.backgroundAspect = 1;
     const value = hex.replace('#', '');
     const normalized = value.length === 3
       ? value.split('').map((character) => character + character).join('')
@@ -172,12 +182,13 @@ export class WebGLCompositor {
 
   render(video: HTMLVideoElement, mask: Uint8Array, maskWidth: number, maskHeight: number, mirror: boolean): void {
     const { gl } = this;
-    if (this.canvas.width !== video.videoWidth || this.canvas.height !== video.videoHeight) {
-      this.canvas.width = video.videoWidth;
-      this.canvas.height = video.videoHeight;
-    }
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.useProgram(this.program);
+    // Center-crop both sources to fill the output without stretching.
+    const outputAspect = this.canvas.width / this.canvas.height;
+    const cameraAspect = video.videoWidth / video.videoHeight;
+    gl.uniform2f(this.cameraScaleLocation, Math.min(1, outputAspect / cameraAspect), Math.min(1, cameraAspect / outputAspect));
+    gl.uniform2f(this.backgroundScaleLocation, Math.min(1, outputAspect / this.backgroundAspect), Math.min(1, this.backgroundAspect / outputAspect));
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.cameraTexture);

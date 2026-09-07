@@ -139,3 +139,38 @@
     width: 100%;
   }
 }
+
+.layout-options {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+}
+
+.layout-options legend {
+  padding: 0 6px;
+  font-size: 14px;
+}
+
+.layout-options label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.layout-options input {
+  accent-color: #529dff;
+}
+
+.layout-options:disabled {
+  opacity: 0.6;
+}
+
+.layout-options:disabled label {
+  cursor: not-allowed;
+}

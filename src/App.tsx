@@ -15,10 +15,11 @@ import { useCamera } from './hooks/useCamera';
 import { CameraPreview } from './components/CameraPreview';
 import { CameraControls } from './components/CameraControls';
 import { BackgroundPicker, BACKGROUNDS } from './components/BackgroundPicker';
-import { BackgroundSelection } from './types/camera';
+import { BackgroundSelection, CanvasLayout } from './types/camera';
 import './App.css';
 
 function App() {
+  const [canvasLayout, setCanvasLayout] = useState<CanvasLayout>('portrait');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -186,8 +187,24 @@ function App() {
       </header>
 
       <main className="app-main">
+        <fieldset className="layout-options" disabled={recordingState !== 'idle'}>
+          <legend>Canvas layout</legend>
+          {(['portrait', 'landscape'] as const).map((layout) => (
+            <label key={layout}>
+              <input
+                type="radio"
+                name="canvas-layout"
+                value={layout}
+                checked={canvasLayout === layout}
+                onChange={() => setCanvasLayout(layout)}
+              />
+              {layout === 'portrait' ? 'Portrait (9:16)' : 'Landscape (16:9)'}
+            </label>
+          ))}
+        </fieldset>
         <div className="preview-section">
           <CameraPreview
+            layout={canvasLayout}
             videoRef={videoRef}
             canvasRef={canvasRef}
             isActive={isActive}

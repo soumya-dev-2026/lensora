@@ -2,7 +2,7 @@
   position: relative;
   width: 100%;
   max-width: 720px;
-  aspect-ratio: 16 / 9;
+
   background: #000;
   border-radius: 8px;
   overflow: hidden;
@@ -44,4 +44,13 @@
   color: rgba(255, 255, 255, .65);
   font-size: 12px;
   font-weight: 400;
+}
+
+.portrait {
+  max-width: 360px;
+  aspect-ratio: 9 / 16;
+}
+
+.landscape {
+  aspect-ratio: 16 / 9;
 }

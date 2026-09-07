@@ -11,6 +11,7 @@ import { WebGLCompositor } from '../rendering/WebGLCompositor';
 import styles from './CameraPreview.module.css';
 
 export const CameraPreview: React.FC<CameraPreviewProps> = ({
+  layout,
   videoRef,
   canvasRef,
   isActive,
@@ -98,7 +99,7 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
   }, [isActive, facingMode, onProcessingState, videoRef]);
 
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${styles[layout]}`}>
       <video
         ref={videoRef}
         className={styles.sourceVideo}
@@ -106,7 +107,12 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
         playsInline
         muted
       />
-      <canvas ref={canvasRef} className={styles.canvas} />
+      <canvas
+        ref={canvasRef}
+        className={styles.canvas}
+        width={layout === 'portrait' ? 720 : 1280}
+        height={layout === 'portrait' ? 1280 : 720}
+      />
       {!isActive && (
         <div className={styles.overlay}>
           <span>Camera is not active</span>
