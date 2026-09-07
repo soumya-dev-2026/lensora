@@ -12,12 +12,12 @@ import styles from './CameraPreview.module.css';
 
 export const CameraPreview: React.FC<CameraPreviewProps> = ({
   videoRef,
+  canvasRef,
   isActive,
   facingMode,
   background,
   onProcessingState,
 }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const compositorRef = useRef<WebGLCompositor | null>(null);
   const segmenterRef = useRef<PersonSegmenter | null>(null);
   const frameRef = useRef<number>();

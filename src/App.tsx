@@ -10,7 +10,7 @@
  * - Handles camera start/stop/switch operations
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useCamera } from './hooks/useCamera';
 import { CameraPreview } from './components/CameraPreview';
 import { CameraControls } from './components/CameraControls';
@@ -19,9 +19,16 @@ import { BackgroundSelection } from './types/camera';
 import './App.css';
 
 function App() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
   const [background, setBackground] = useState<BackgroundSelection>({ kind: 'image', value: BACKGROUNDS[0].src });
   const [processing, setProcessing] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [processingError, setProcessingError] = useState<string>();
+  const [recordingState, setRecordingState] = useState<'idle' | 'starting' | 'recording' | 'paused'>('idle');
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+  const [fileName, setFileName] = useState('background-video');
+  const startWhenReadyRef = useRef(false);
   const {
     videoRef,
     isActive,
@@ -50,13 +57,103 @@ function App() {
     setBackground(nextBackground);
   };
 
-  // Handle camera toggle
-  const handleToggleCamera = async () => {
-    if (isActive) {
-      stopCamera();
-    } else {
-      await startCamera();
+  const beginRecording = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !('MediaRecorder' in window) || typeof canvas.captureStream !== 'function') {
+      setRecordingError('Video recording is not supported in this browser. Try Chrome, Edge, or Firefox.');
+      setRecordingState('idle');
+      return;
     }
+
+    const mimeType = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
+      .find((type) => MediaRecorder.isTypeSupported(type));
+    const recorder = new MediaRecorder(canvas.captureStream(30), mimeType ? { mimeType } : undefined);
+    chunksRef.current = [];
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunksRef.current.push(event.data);
+    };
+    recorder.onerror = () => {
+      setRecordingError('The recording stopped unexpectedly. Please try again.');
+      setRecordingState('idle');
+    };
+    recorder.start(1000);
+    recorderRef.current = recorder;
+    setRecordingError(null);
+    setRecordingState('recording');
+  }, []);
+
+  useEffect(() => {
+    if (isActive && processing === 'ready' && startWhenReadyRef.current) {
+      startWhenReadyRef.current = false;
+      beginRecording();
+    }
+  }, [beginRecording, isActive, processing]);
+
+  useEffect(() => {
+    if (error && recordingState === 'starting') {
+      startWhenReadyRef.current = false;
+      setRecordingState('idle');
+    }
+  }, [error, recordingState]);
+
+  useEffect(() => () => {
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== 'inactive') recorder.stop();
+  }, []);
+
+  const handleStart = async () => {
+    setRecordingError(null);
+    if (!isActive) {
+      startWhenReadyRef.current = true;
+      setRecordingState('starting');
+      await startCamera();
+      return;
+    }
+    if (processing !== 'ready') {
+      startWhenReadyRef.current = true;
+      setRecordingState('starting');
+      return;
+    }
+    beginRecording();
+  };
+
+  const handlePause = () => {
+    if (recorderRef.current?.state === 'recording') {
+      recorderRef.current.pause();
+      setRecordingState('paused');
+    }
+  };
+
+  const handleResume = () => {
+    if (recorderRef.current?.state === 'paused') {
+      recorderRef.current.resume();
+      setRecordingState('recording');
+    }
+  };
+
+  const handleSave = () => {
+    const recorder = recorderRef.current;
+    if (!recorder || recorder.state === 'inactive') return;
+    const safeName = fileName.trim().replace(/[^a-z0-9-_]+/gi, '-') || 'background-video';
+    recorder.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${safeName}.webm`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      chunksRef.current = [];
+      recorderRef.current = null;
+      setRecordingState('idle');
+    };
+    recorder.stop();
+  };
+
+  const handleStopCamera = () => {
+    startWhenReadyRef.current = false;
+    stopCamera();
+    setRecordingState('idle');
   };
 
   // Handle camera switch
@@ -92,6 +189,7 @@ function App() {
         <div className="preview-section">
           <CameraPreview
             videoRef={videoRef}
+            canvasRef={canvasRef}
             isActive={isActive}
             facingMode={facingMode}
             background={background}
@@ -103,11 +201,19 @@ function App() {
         {processingError && <div className="processing-error">{processingError}</div>}
 
         <CameraControls
-          onToggleCamera={handleToggleCamera}
+          onStart={handleStart}
+          onPause={handlePause}
+          onResume={handleResume}
+          onSave={handleSave}
+          onStopCamera={handleStopCamera}
           onSwitchFacing={handleSwitchCamera}
           isActive={isActive}
+          recordingState={recordingState}
+          fileName={fileName}
+          onFileNameChange={setFileName}
           facingMode={facingMode}
           error={error}
+          recordingError={recordingError}
         />
 
         <BackgroundPicker selected={background} onSelect={handleBackgroundChange} />
@@ -121,6 +227,7 @@ function App() {
               <li>Browser: {isSupported ? '✓ Supported' : '✗ Not Supported'}</li>
               <li>AI segmentation: {processing === 'ready' ? '✓ Ready' : processing === 'loading' ? 'Loading…' : 'Waiting'}</li>
               <li>Compositor: WebGL 2</li>
+              <li>Recording: {recordingState === 'recording' ? '● Recording' : recordingState === 'paused' ? 'Paused' : recordingState === 'starting' ? 'Starting…' : 'Idle'}</li>
             </ul>
           </div>
         </div>

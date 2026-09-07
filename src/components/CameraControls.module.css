@@ -70,12 +70,61 @@
   background: #555;
 }
 
+.button.recording {
+  background: #c62828;
+}
+
+.button.recording:hover:not(:disabled) {
+  background: #a51f1f;
+}
+
+.button.stop {
+  background: #444;
+}
+
+.button.save {
+  flex: 0 0 auto;
+  background: #087f5b;
+}
+
+.savePanel {
+  padding: 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.savePanel label {
+  display: block;
+  margin-bottom: 8px;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.saveRow {
+  display: flex;
+  gap: 10px;
+}
+
+.saveRow input {
+  min-width: 0;
+  flex: 1;
+  padding: 11px 12px;
+  border: 1px solid #94a3b8;
+  border-radius: 4px;
+  font: inherit;
+}
+
 @media (max-width: 480px) {
   .button {
     min-width: 100%;
   }
 
   .buttons {
+    flex-direction: column;
+  }
+
+  .saveRow {
     flex-direction: column;
   }
 }

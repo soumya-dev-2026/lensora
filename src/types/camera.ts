@@ -45,6 +45,7 @@ export interface CameraState {
 
 export interface CameraPreviewProps {
   videoRef: React.RefObject<HTMLVideoElement>;
+  canvasRef: React.RefObject<HTMLCanvasElement>;
   isActive: boolean;
   facingMode: 'user' | 'environment';
   background: BackgroundSelection;
@@ -56,9 +57,17 @@ export type BackgroundSelection =
   | { kind: 'color'; value: string };
 
 export interface CameraControlsProps {
-  onToggleCamera: () => void;
+  onStart: () => void;
+  onPause: () => void;
+  onResume: () => void;
+  onSave: () => void;
+  onStopCamera: () => void;
   onSwitchFacing: () => void;
   isActive: boolean;
+  recordingState: 'idle' | 'starting' | 'recording' | 'paused';
+  fileName: string;
+  onFileNameChange: (value: string) => void;
   facingMode: 'user' | 'environment';
   error: string | null;
+  recordingError: string | null;
 }
