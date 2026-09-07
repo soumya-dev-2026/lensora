@@ -46,7 +46,14 @@ export interface CameraState {
 export interface CameraPreviewProps {
   videoRef: React.RefObject<HTMLVideoElement>;
   isActive: boolean;
+  facingMode: 'user' | 'environment';
+  background: BackgroundSelection;
+  onProcessingState?: (state: 'idle' | 'loading' | 'ready' | 'error', message?: string) => void;
 }
+
+export type BackgroundSelection =
+  | { kind: 'image'; value: string }
+  | { kind: 'color'; value: string };
 
 export interface CameraControlsProps {
   onToggleCamera: () => void;

@@ -1,4 +1,4 @@
-.camera-controls {
+.controls {
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -7,7 +7,7 @@
   margin: 20px auto;
 }
 
-.camera-error {
+.error {
   background: #fee;
   border: 1px solid #f00;
   color: #c00;
@@ -17,14 +17,14 @@
   line-height: 1.5;
 }
 
-.camera-buttons {
+.buttons {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
   justify-content: center;
 }
 
-.camera-button {
+.button {
   padding: 12px 24px;
   font-size: 16px;
   font-weight: 600;
@@ -38,44 +38,44 @@
   min-width: 150px;
 }
 
-.camera-button:hover:not(:disabled) {
+.button:hover:not(:disabled) {
   background: #0052a3;
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-.camera-button:active:not(:disabled) {
+.button:active:not(:disabled) {
   transform: translateY(0);
 }
 
-.camera-button:disabled {
+.button:disabled {
   background: #ccc;
   cursor: not-allowed;
   opacity: 0.6;
 }
 
-.camera-button.active {
+.button.active {
   background: #00cc00;
 }
 
-.camera-button.active:hover {
+.button.active:hover {
   background: #00aa00;
 }
 
-.camera-button.switch-button {
+.button.switch {
   background: #666;
 }
 
-.camera-button.switch-button:hover:not(:disabled) {
+.button.switch:hover:not(:disabled) {
   background: #555;
 }
 
 @media (max-width: 480px) {
-  .camera-button {
+  .button {
     min-width: 100%;
   }
 
-  .camera-buttons {
+  .buttons {
     flex-direction: column;
   }
 }

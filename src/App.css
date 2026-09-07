@@ -43,6 +43,19 @@
   justify-content: center;
 }
 
+.processing-banner, .processing-error {
+  width: calc(100% - 32px);
+  max-width: 688px;
+  margin-top: -12px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.processing-banner { background: rgba(82, 141, 255, .16); color: #b9d2ff; }
+.processing-error { background: rgba(255, 82, 82, .15); color: #ffb9b9; }
+
 .info-section {
   width: 100%;
   max-width: 720px;

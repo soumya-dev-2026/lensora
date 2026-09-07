@@ -24,7 +24,12 @@ interface UseCameraReturn {
 export function useCamera(): UseCameraReturn {
   const videoRef = useRef<HTMLVideoElement>(null);
   const cameraManagerRef = useRef(new CameraManager());
-  const [state, setState] = useState<CameraState>(CameraManager.getDefaultOptions() as unknown as CameraState);
+  const [state, setState] = useState<CameraState>({
+    isActive: false,
+    facingMode: 'user',
+    stream: null,
+    error: null,
+  });
   const [isSupported] = useState(CameraManager.isCameraSupported());
   const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
 

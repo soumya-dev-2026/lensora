@@ -85,6 +85,7 @@ export class CameraManager {
       this.notifyListeners();
     } catch (err) {
       this.handleError(err);
+      throw err;
     }
   }
 
@@ -112,9 +113,11 @@ export class CameraManager {
     }
 
     const newFacingMode = this.facingMode === 'user' ? 'environment' : 'user';
+    const previousFacingMode = this.facingMode;
     const currentStream = this.stream;
 
     try {
+      this.isActive = false;
       await this.start({ facingMode: newFacingMode });
       if (currentStream) {
         currentStream.getTracks().forEach((track) => {
@@ -123,7 +126,10 @@ export class CameraManager {
       }
     } catch (err) {
       this.stream = currentStream;
-      this.handleError(err);
+      this.isActive = true;
+      this.facingMode = previousFacingMode;
+      this.notifyListeners();
+      throw err;
     }
   }
 

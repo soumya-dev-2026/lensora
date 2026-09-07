@@ -1,0 +1,19 @@
+.panel { width: 100%; max-width: 720px; }
+.panel h2 { margin: 0 0 4px; font-size: 18px; }
+.panel p { margin: 0 0 14px; color: rgba(255,255,255,.65); font-size: 13px; }
+.options { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.options button { padding: 4px; border: 2px solid transparent; border-radius: 12px; background: rgba(255,255,255,.08); color: white; cursor: pointer; text-align: left; transition: .2s ease; }
+.options button:hover { transform: translateY(-2px); background: rgba(255,255,255,.14); }
+.options button.selected { border-color: #70a5ff; box-shadow: 0 0 0 3px rgba(82,141,255,.2); }
+.options img { display: block; width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 7px; }
+.options span { display: block; padding: 7px 6px 5px; font-size: 12px; font-weight: 600; }
+.colorOption { padding: 4px; border: 2px solid transparent; border-radius: 12px; background: rgba(255,255,255,.08); cursor: pointer; }
+.colorOption input { display: block; box-sizing: border-box; width: 100%; height: auto; aspect-ratio: 16/9; padding: 0; border: 0; border-radius: 7px; background: transparent; cursor: pointer; }
+.colorOption input::-webkit-color-swatch-wrapper { padding: 0; }
+.colorOption input::-webkit-color-swatch { border: 0; border-radius: 7px; }
+.colorOption span { color: white; }
+.upload { display: flex; flex-direction: column; justify-content: space-between; }
+.uploadIcon { display: grid !important; place-items: center; width: 100%; flex: 1; min-height: 54px; padding: 0 !important; border-radius: 7px; background: rgba(255,255,255,.08); font-size: 30px !important; font-weight: 300 !important; }
+.fileInput { display: none; }
+@media (max-width: 720px) { .options { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 520px) { .options { gap: 7px; } .options span { font-size: 10px; } }

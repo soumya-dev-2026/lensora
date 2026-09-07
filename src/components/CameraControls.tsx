@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { CameraControlsProps } from '../types/camera';
-import './CameraControls.module.css';
+import styles from './CameraControls.module.css';
 
 export const CameraControls: React.FC<CameraControlsProps> = ({
   onToggleCamera,
@@ -19,14 +19,14 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
   error,
 }) => {
   return (
-    <div className="camera-controls">
-      {error && <div className="camera-error">{error}</div>}
+    <div className={styles.controls}>
+      {error && <div className={styles.error}>{error}</div>}
 
-      <div className="camera-buttons">
+      <div className={styles.buttons}>
         <button
           onClick={onToggleCamera}
-          className={`camera-button toggle-button ${
-            isActive ? 'active' : ''
+          className={`${styles.button} ${
+            isActive ? styles.active : ''
           }`}
           aria-label={isActive ? 'Stop camera' : 'Start camera'}
         >
@@ -36,7 +36,7 @@ export const CameraControls: React.FC<CameraControlsProps> = ({
         <button
           onClick={onSwitchFacing}
           disabled={!isActive}
-          className="camera-button switch-button"
+          className={`${styles.button} ${styles.switch}`}
           aria-label="Switch camera (front/rear)"
         >
           🔄 Switch ({facingMode === 'user' ? 'Front' : 'Rear'})
