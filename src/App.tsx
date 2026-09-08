@@ -1,260 +1,219 @@
-/**
- * Main Application Component
- * 
- * Phase 1 MVP: Camera setup
- * 
- * This component:
- * - Manages the overall application state
- * - Integrates the camera hook
- * - Renders the preview and controls
- * - Handles camera start/stop/switch operations
- */
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useCamera } from './hooks/useCamera';
 import { CameraPreview } from './components/CameraPreview';
-import { CameraControls } from './components/CameraControls';
 import { BackgroundPicker, BACKGROUNDS } from './components/BackgroundPicker';
+import { Modal } from './components/Modal';
 import { BackgroundSelection, CanvasLayout } from './types/camera';
 import './App.css';
 
+type RecordingState = 'idle' | 'starting' | 'recording' | 'paused' | 'stopping';
+const formatTime = (ms: number) => {
+  const seconds = Math.floor(ms / 1000);
+  return `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
+};
+
 function App() {
-  const [canvasLayout, setCanvasLayout] = useState<CanvasLayout>('portrait');
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const [layout, setLayout] = useState<CanvasLayout>('landscape');
   const [background, setBackground] = useState<BackgroundSelection>({ kind: 'image', value: BACKGROUNDS[0].src });
+  const [blur, setBlur] = useState(0);
+  const [tint, setTint] = useState(0);
   const [processing, setProcessing] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [processingError, setProcessingError] = useState<string>();
-  const [recordingState, setRecordingState] = useState<'idle' | 'starting' | 'recording' | 'paused'>('idle');
+  const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [fileName, setFileName] = useState('background-video');
-  const startWhenReadyRef = useRef(false);
-  const {
-    videoRef,
-    isActive,
-    facingMode,
-    error,
-    startCamera,
-    stopCamera,
-    switchCamera,
-    isSupported,
-  } = useCamera();
+  const [savedClip, setSavedClip] = useState<Blob | null>(null);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [clipUrl, setClipUrl] = useState('');
+  const [elapsed, setElapsed] = useState(0);
+  const [fullscreen, setFullscreen] = useState(false);
+  const studioRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const pendingStart = useRef(false);
+  const accumulated = useRef(0);
+  const startedAt = useRef(0);
+  const { videoRef, isActive, facingMode, error, startCamera, stopCamera, switchCamera, isSupported, hasMultipleCameras } = useCamera();
+  const busy = recordingState !== 'idle';
 
-  const handleProcessingState = useCallback((state: 'idle' | 'loading' | 'ready' | 'error', message?: string) => {
+  const handleProcessingState = useCallback((state: typeof processing, message?: string) => {
     setProcessing(state);
     setProcessingError(message);
   }, []);
 
   useEffect(() => {
-    return () => {
-      if (background.kind === 'image' && background.value.startsWith('blob:')) {
-        URL.revokeObjectURL(background.value);
-      }
-    };
-  }, [background]);
+    if (!savedClip) { setClipUrl(''); return; }
+    const url = URL.createObjectURL(savedClip);
+    setClipUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [savedClip]);
 
-  const handleBackgroundChange = (nextBackground: BackgroundSelection) => {
-    setBackground(nextBackground);
-  };
-
-  const beginRecording = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !('MediaRecorder' in window) || typeof canvas.captureStream !== 'function') {
-      setRecordingError('Video recording is not supported in this browser. Try Chrome, Edge, or Firefox.');
-      setRecordingState('idle');
-      return;
-    }
-
-    const mimeType = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
-      .find((type) => MediaRecorder.isTypeSupported(type));
-    const recorder = new MediaRecorder(canvas.captureStream(30), mimeType ? { mimeType } : undefined);
-    chunksRef.current = [];
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) chunksRef.current.push(event.data);
-    };
-    recorder.onerror = () => {
-      setRecordingError('The recording stopped unexpectedly. Please try again.');
-      setRecordingState('idle');
-    };
-    recorder.start(1000);
-    recorderRef.current = recorder;
-    setRecordingError(null);
-    setRecordingState('recording');
+  useEffect(() => {
+    const update = () => setFullscreen(document.fullscreenElement === studioRef.current);
+    document.addEventListener('fullscreenchange', update);
+    return () => document.removeEventListener('fullscreenchange', update);
   }, []);
 
   useEffect(() => {
-    if (isActive && processing === 'ready' && startWhenReadyRef.current) {
-      startWhenReadyRef.current = false;
-      beginRecording();
-    }
-  }, [beginRecording, isActive, processing]);
-
-  useEffect(() => {
-    if (error && recordingState === 'starting') {
-      startWhenReadyRef.current = false;
-      setRecordingState('idle');
-    }
-  }, [error, recordingState]);
+    if (recordingState !== 'recording') return;
+    const timer = window.setInterval(() => setElapsed(accumulated.current + performance.now() - startedAt.current), 200);
+    return () => window.clearInterval(timer);
+  }, [recordingState]);
 
   useEffect(() => () => {
     const recorder = recorderRef.current;
-    if (recorder && recorder.state !== 'inactive') recorder.stop();
+    if (recorder) {
+      recorder.onstop = null;
+      recorder.ondataavailable = null;
+      recorder.onerror = null;
+      if (recorder.state !== 'inactive') recorder.stop();
+      recorder.stream.getTracks().forEach((track) => track.stop());
+    }
   }, []);
 
-  const handleStart = async () => {
+  const beginRecording = useCallback(() => {
+    let stream: MediaStream | undefined;
+    try {
+      const canvas = canvasRef.current;
+      if (!canvas || !window.MediaRecorder || !canvas.captureStream) throw new Error('Video recording is unavailable in this browser.');
+      const mimeType = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4']
+        .find((type) => MediaRecorder.isTypeSupported(type));
+      stream = canvas.captureStream(30);
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+      recorder.onstop = () => {
+        recorder.stream.getTracks().forEach((track) => track.stop());
+        const blob = new Blob(chunks, { type: recorder.mimeType || chunks[0]?.type || 'video/webm' });
+        if (blob.size) { setSavedClip(blob); setSaveOpen(true); }
+        else setRecordingError('No video was captured. Please try again.');
+        recorderRef.current = null;
+        setRecordingState('idle');
+      };
+      recorder.onerror = () => {
+        setRecordingError('Recording was interrupted. Any captured video will be available to save.');
+        if (recorder.state !== 'inactive') recorder.stop();
+      };
+      recorder.start(250);
+      recorderRef.current = recorder;
+      accumulated.current = 0;
+      startedAt.current = performance.now();
+      setElapsed(0);
+      setRecordingState('recording');
+      setRecordingError(null);
+    } catch (error) {
+      stream?.getTracks().forEach((track) => track.stop());
+      setRecordingError(error instanceof Error ? error.message : 'Could not start recording.');
+      setRecordingState('idle');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (pendingStart.current && isActive && processing === 'ready') {
+      pendingStart.current = false;
+      beginRecording();
+    }
+    if (error || processing === 'error') {
+      pendingStart.current = false;
+      setRecordingState((current) => current === 'starting' ? 'idle' : current);
+      const recorder = recorderRef.current;
+      if (recorder && recorder.state !== 'inactive') {
+        setRecordingError('Camera processing stopped. Save the video captured so far.');
+        recorder.stop();
+      }
+    }
+  }, [isActive, processing, error, beginRecording]);
+
+  const record = async () => {
+    if (savedClip) { setSaveOpen(true); return; }
     setRecordingError(null);
-    if (!isActive) {
-      startWhenReadyRef.current = true;
-      setRecordingState('starting');
-      await startCamera();
-      return;
-    }
-    if (processing !== 'ready') {
-      startWhenReadyRef.current = true;
-      setRecordingState('starting');
-      return;
-    }
-    beginRecording();
+    if (isActive && processing === 'ready') { beginRecording(); return; }
+    pendingStart.current = true;
+    setRecordingState('starting');
+    if (!isActive) await startCamera();
   };
-
-  const handlePause = () => {
-    if (recorderRef.current?.state === 'recording') {
-      recorderRef.current.pause();
+  const pauseOrResume = () => {
+    const recorder = recorderRef.current;
+    if (recorder?.state === 'recording') {
+      recorder.pause();
+      accumulated.current += performance.now() - startedAt.current;
+      setElapsed(accumulated.current);
       setRecordingState('paused');
-    }
-  };
-
-  const handleResume = () => {
-    if (recorderRef.current?.state === 'paused') {
-      recorderRef.current.resume();
+    } else if (recorder?.state === 'paused') {
+      recorder.resume();
+      startedAt.current = performance.now();
       setRecordingState('recording');
     }
   };
-
-  const handleSave = () => {
+  const stop = () => {
     const recorder = recorderRef.current;
     if (!recorder || recorder.state === 'inactive') return;
-    const safeName = fileName.trim().replace(/[^a-z0-9-_]+/gi, '-') || 'background-video';
-    recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'video/webm' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${safeName}.webm`;
-      link.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      chunksRef.current = [];
-      recorderRef.current = null;
-      setRecordingState('idle');
-    };
+    if (recorder.state === 'recording') accumulated.current += performance.now() - startedAt.current;
+    setElapsed(accumulated.current);
+    setRecordingState('stopping');
     recorder.stop();
   };
-
-  const handleStopCamera = () => {
-    startWhenReadyRef.current = false;
-    stopCamera();
-    setRecordingState('idle');
+  const save = () => {
+    if (!savedClip || !clipUrl) return;
+    const extension = savedClip.type.includes('mp4') ? 'mp4' : 'webm';
+    const safeName = fileName.trim().replace(/\.(webm|mp4)$/i, '').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-').slice(0, 120) || 'background-video';
+    const link = document.createElement('a');
+    link.href = clipUrl;
+    link.download = `${safeName}.${extension}`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setSaveOpen(false);
   };
-
-  // Handle camera switch
-  const handleSwitchCamera = async () => {
+  const toggleFullscreen = async () => {
     try {
-      await switchCamera();
-    } catch (err) {
-      console.error('Failed to switch camera:', err);
-    }
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await studioRef.current?.requestFullscreen();
+    } catch { setRecordingError('Fullscreen is unavailable in this browser. The canvas still fills the studio view.'); }
   };
+  const message = error || processingError || recordingError;
 
-  // Show unsupported message if camera API is not available
-  if (!isSupported) {
-    return (
-      <div className="app-container">
-        <h1>Background Studio</h1>
-        <div className="error-message">
-          <p>Your browser does not support camera access.</p>
-          <p>Please use a modern browser (Chrome, Edge, Firefox, or Safari) on a device with a camera.</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="app-container">
-      <header className="app-header">
-        <h1>🎥 Background Studio</h1>
-        <p>Private, on-device AI background replacement</p>
-      </header>
-
-      <main className="app-main">
-        <fieldset className="layout-options" disabled={recordingState !== 'idle'}>
-          <legend>Canvas layout</legend>
-          {(['portrait', 'landscape'] as const).map((layout) => (
-            <label key={layout}>
-              <input
-                type="radio"
-                name="canvas-layout"
-                value={layout}
-                checked={canvasLayout === layout}
-                onChange={() => setCanvasLayout(layout)}
-              />
-              {layout === 'portrait' ? 'Portrait (9:16)' : 'Landscape (16:9)'}
-            </label>
-          ))}
-        </fieldset>
-        <div className="preview-section">
-          <CameraPreview
-            layout={canvasLayout}
-            videoRef={videoRef}
-            canvasRef={canvasRef}
-            isActive={isActive}
-            facingMode={facingMode}
-            background={background}
-            onProcessingState={handleProcessingState}
-          />
-        </div>
-
-        {isActive && processing === 'loading' && <div className="processing-banner">Loading the AI model…</div>}
-        {processingError && <div className="processing-error">{processingError}</div>}
-
-        <CameraControls
-          onStart={handleStart}
-          onPause={handlePause}
-          onResume={handleResume}
-          onSave={handleSave}
-          onStopCamera={handleStopCamera}
-          onSwitchFacing={handleSwitchCamera}
-          isActive={isActive}
-          recordingState={recordingState}
-          fileName={fileName}
-          onFileNameChange={setFileName}
-          facingMode={facingMode}
-          error={error}
-          recordingError={recordingError}
-        />
-
-        <BackgroundPicker selected={background} onSelect={handleBackgroundChange} />
-
-        <div className="info-section">
-          <div className="status-info">
-            <h3>Status</h3>
-            <ul>
-              <li>Camera: {isActive ? '✓ Active' : '✗ Inactive'}</li>
-              <li>Facing: {facingMode === 'user' ? 'Front' : 'Rear'}</li>
-              <li>Browser: {isSupported ? '✓ Supported' : '✗ Not Supported'}</li>
-              <li>AI segmentation: {processing === 'ready' ? '✓ Ready' : processing === 'loading' ? 'Loading…' : 'Waiting'}</li>
-              <li>Compositor: WebGL 2</li>
-              <li>Recording: {recordingState === 'recording' ? '● Recording' : recordingState === 'paused' ? 'Paused' : recordingState === 'starting' ? 'Starting…' : 'Idle'}</li>
-            </ul>
-          </div>
-        </div>
-      </main>
-
-      <footer className="app-footer">
-        <p>Camera processing stays on this device</p>
-      </footer>
+  return <div className="studio" ref={studioRef}>
+    <main className="stage" aria-label="Camera studio">
+      <CameraPreview layout={layout} videoRef={videoRef} canvasRef={canvasRef} isActive={isActive} facingMode={facingMode} background={background} blur={blur} tint={tint} onProcessingState={handleProcessingState} />
+    </main>
+    <div className="top-left">
+      <div className={`recording-time ${recordingState === 'recording' ? 'live' : ''}`} role="timer" aria-label={`Recording time ${formatTime(elapsed)}`}><i />{formatTime(elapsed)}<span>{recordingState === 'paused' ? 'PAUSED' : recordingState === 'recording' ? 'REC' : 'STUDIO'}</span></div>
+      <BackgroundPicker selected={background} onSelect={setBackground} blur={blur} tint={tint} onBlur={setBlur} onTint={setTint} />
     </div>
-  );
+    <div className="top-right">
+      <label className="layout-control"><span className="sr-only">Canvas orientation</span><select aria-label="Canvas orientation" value={layout} disabled={busy} onChange={(event) => setLayout(event.target.value as CanvasLayout)}><option value="landscape">Landscape · 16:9</option><option value="portrait">Portrait · 9:16</option></select></label>
+      <button className="glass" aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} onClick={() => void toggleFullscreen()}>⛶</button>
+    </div>
+    <div className="status-area" aria-live="polite">
+      {!isSupported && <p role="alert">Camera access is unavailable. Open this app over HTTPS in a camera-capable browser.</p>}
+      {message && <p role="alert">{message}</p>}
+      {processing === 'loading' && <p>Preparing your camera and background…</p>}
+      {!isActive && isSupported && recordingState === 'idle' && <button className="primary" onClick={() => void startCamera()}>Start camera</button>}
+      {isActive && processing === 'error' && !busy && <button onClick={stopCamera}>Reset camera</button>}
+      {savedClip && !saveOpen && <div className="clip-actions"><button onClick={() => setSaveOpen(true)}>Review & save video</button><button onClick={() => { setSavedClip(null); setElapsed(0); }}>New recording</button></div>}
+    </div>
+    <div className="bottom-left"><span className="brand">BACKGROUND STUDIO</span><small>Processed on your device</small></div>
+    <div className="record-controls">
+      {recordingState === 'recording' || recordingState === 'paused' ? <>
+        <button className="record-small pause" aria-label={recordingState === 'paused' ? 'Resume recording' : 'Pause recording'} onClick={pauseOrResume}>{recordingState === 'paused' ? '▶' : 'Ⅱ'}</button>
+        <button className="record-small stop" aria-label="Stop recording" onClick={stop}><span /></button>
+        <span className="record-caption">{recordingState === 'paused' ? 'Resume' : 'Pause'} / Stop</span>
+      </> : <>
+        <button className="record-button" aria-label={savedClip ? "Review recording" : "Start recording"} disabled={!isSupported || busy || (isActive && processing === 'error')} onClick={() => void record()}><span /></button>
+        <span className="record-caption">{recordingState === 'starting' ? 'Getting ready…' : recordingState === 'stopping' ? 'Finishing…' : savedClip ? 'Review recording' : 'Record'}</span>
+      </>}
+    </div>
+    <div className="bottom-right">
+      {hasMultipleCameras && <button className="glass" disabled={!isActive || busy} onClick={() => void switchCamera()}>Switch camera</button>}
+      {isActive && <button className="glass" disabled={busy} onClick={stopCamera}>Camera off</button>}
+    </div>
+    {saveOpen && savedClip && <Modal title="Your video is ready" onClose={() => setSaveOpen(false)}>
+      {clipUrl && <video className="recorded-preview" src={clipUrl} controls playsInline />}
+      <p className="muted">{formatTime(elapsed)} · {(savedClip.size / 1024 / 1024).toFixed(1)} MB · Video only</p>
+      <label className="filename">File name<input autoFocus value={fileName} maxLength={120} onChange={(event) => setFileName(event.target.value)} placeholder="background-video" /></label>
+      <button className="primary" disabled={!clipUrl} onClick={save}>Save video</button>
+    </Modal>}
+  </div>;
 }
-
 export default App;

@@ -52,12 +52,15 @@ export interface CameraPreviewProps {
   isActive: boolean;
   facingMode: 'user' | 'environment';
   background: BackgroundSelection;
+  blur: number;
+  tint: number;
   onProcessingState?: (state: 'idle' | 'loading' | 'ready' | 'error', message?: string) => void;
 }
 
 export type BackgroundSelection =
   | { kind: 'image'; value: string }
-  | { kind: 'color'; value: string };
+  | { kind: 'color'; value: string }
+  | { kind: 'blur'; value: string };
 
 export interface CameraControlsProps {
   onStart: () => void;

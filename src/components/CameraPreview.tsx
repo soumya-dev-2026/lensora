@@ -1,124 +1,93 @@
-/**
- * Camera Preview Component
- * 
- * Displays the live camera feed.
- */
-
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CameraPreviewProps } from '../types/camera';
 import { PersonSegmenter } from '../ai/PersonSegmenter';
 import { WebGLCompositor } from '../rendering/WebGLCompositor';
 import styles from './CameraPreview.module.css';
 
-export const CameraPreview: React.FC<CameraPreviewProps> = ({
-  layout,
-  videoRef,
-  canvasRef,
-  isActive,
-  facingMode,
-  background,
-  onProcessingState,
-}) => {
+export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMode, background, blur, tint, onProcessingState }: CameraPreviewProps) {
   const compositorRef = useRef<WebGLCompositor | null>(null);
-  const segmenterRef = useRef<PersonSegmenter | null>(null);
-  const frameRef = useRef<number>();
-  const backgroundRef = useRef(background);
-  const previousMaskRef = useRef<Uint8Array | null>(null);
-
-  const applyBackground = (compositor: WebGLCompositor, nextBackground: typeof background) => {
-    if (nextBackground.kind === 'color') {
-      compositor.setBackgroundColor(nextBackground.value);
-      return;
-    }
-    const image = new Image();
-    image.onload = () => compositor.setBackground(image);
-    image.src = nextBackground.value;
-  };
+  const settings = useRef({ background, blur, tint });
+  settings.current = { background, blur, tint };
+  const [generation, setGeneration] = useState(0);
+  const [backgroundError, setBackgroundError] = useState<string>();
 
   useEffect(() => {
-    backgroundRef.current = background;
-    if (compositorRef.current) applyBackground(compositorRef.current, background);
-  }, [background]);
-
-  useEffect(() => {
-    if (!isActive || !canvasRef.current) return;
+    const compositor = compositorRef.current;
+    if (!compositor) return;
     let cancelled = false;
-    let lastFrame = 0;
-    previousMaskRef.current = null;
-    const segmenter = new PersonSegmenter();
-    segmenterRef.current = segmenter;
-    onProcessingState?.('loading');
+    setBackgroundError(undefined);
+    if (background.kind === 'color') compositor.setBackgroundColor(background.value);
+    if (background.kind === 'image') {
+      const image = new Image();
+      image.crossOrigin = 'anonymous';
+      image.onload = () => {
+        if (cancelled) return;
+        try { compositor.setBackground(image); }
+        catch { setBackgroundError('Could not render this image. Choose another background.'); }
+      };
+      image.onerror = () => {
+        if (!cancelled) setBackgroundError('Could not load this background. Choose another image.');
+      };
+      image.src = background.value;
+    }
+    return () => { cancelled = true; };
+  }, [background, generation]);
 
+  useEffect(() => {
+    if (!isActive || !canvasRef.current) { onProcessingState?.('idle'); return; }
+    let cancelled = false;
+    let frame = 0;
+    let lastVideoTime = -1;
+    let previousMask: Uint8Array | null = null;
+    let compositor: WebGLCompositor | undefined;
+    const segmenter = new PersonSegmenter();
+    onProcessingState?.('loading');
+    const fail = (error: unknown) => {
+      if (!cancelled) onProcessingState?.('error', error instanceof Error ? error.message : 'Camera processing failed.');
+    };
     const start = async () => {
       try {
-        const compositor = new WebGLCompositor(canvasRef.current!);
+        compositor = new WebGLCompositor(canvasRef.current!);
         compositorRef.current = compositor;
-        applyBackground(compositor, backgroundRef.current);
+        setGeneration((value) => value + 1);
         await segmenter.initialize();
-        if (cancelled) return;
-        onProcessingState?.('ready');
-
+        if (cancelled) { segmenter.dispose(); return; }
+        let ready = false;
         const processFrame = (time: number) => {
           if (cancelled) return;
-          const video = videoRef.current;
-          if (video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && time - lastFrame >= 33) {
-            lastFrame = time;
-            const mask = segmenter.segment(video, time);
-            if (mask) {
-              let stableMask = previousMaskRef.current;
-              if (!stableMask || stableMask.length !== mask.data.length) {
-                stableMask = new Uint8Array(mask.data);
-                previousMaskRef.current = stableMask;
-              } else {
-                // Preserve fine detail while damping single-frame edge flicker.
-                for (let index = 0; index < mask.data.length; index += 1) {
-                  stableMask[index] = mask.data[index] * 0.68 + stableMask[index] * 0.32;
-                }
+          try {
+            const video = videoRef.current;
+            if (video && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
+              lastVideoTime = video.currentTime;
+              const mask = segmenter.segment(video, time);
+              if (mask) {
+                if (!previousMask || previousMask.length !== mask.data.length) previousMask = mask.data;
+                else for (let i = 0; i < mask.data.length; i++) previousMask[i] = Math.round(mask.data[i] * 0.8 + previousMask[i] * 0.2);
+                const effect = settings.current;
+                compositor!.render(video, previousMask, mask.width, mask.height, facingMode === 'user', effect.background.kind === 'blur', effect.blur, effect.tint);
+                if (!ready) { ready = true; onProcessingState?.('ready'); }
               }
-              compositor.render(video, stableMask, mask.width, mask.height, facingMode === 'user');
             }
-          }
-          frameRef.current = requestAnimationFrame(processFrame);
+            frame = requestAnimationFrame(processFrame);
+          } catch (error) { fail(error); }
         };
-        frameRef.current = requestAnimationFrame(processFrame);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'AI background processing failed.';
-        onProcessingState?.('error', message);
-      }
+        frame = requestAnimationFrame(processFrame);
+      } catch (error) { fail(error); }
     };
-    start();
-
+    void start();
     return () => {
       cancelled = true;
-      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+      cancelAnimationFrame(frame);
       segmenter.dispose();
-      segmenterRef.current = null;
+      compositor?.dispose();
       compositorRef.current = null;
-      previousMaskRef.current = null;
     };
-  }, [isActive, facingMode, onProcessingState, videoRef]);
+  }, [isActive, facingMode, onProcessingState, videoRef, canvasRef]);
 
-  return (
-    <div className={`${styles.container} ${styles[layout]}`}>
-      <video
-        ref={videoRef}
-        className={styles.sourceVideo}
-        autoPlay
-        playsInline
-        muted
-      />
-      <canvas
-        ref={canvasRef}
-        className={styles.canvas}
-        width={layout === 'portrait' ? 720 : 1280}
-        height={layout === 'portrait' ? 1280 : 720}
-      />
-      {!isActive && (
-        <div className={styles.overlay}>
-          <span>Camera is not active</span>
-          <small>Start the camera to replace your background</small>
-        </div>
-      )}
-    </div>
-  );
-};
+  return <div className={`${styles.container} ${styles[layout]}`}>
+    <video ref={videoRef} className={styles.sourceVideo} autoPlay playsInline muted />
+    <canvas ref={canvasRef} className={styles.canvas} width={layout === 'portrait' ? 720 : 1280} height={layout === 'portrait' ? 1280 : 720} />
+    {!isActive && <div className={styles.overlay}><span>Your space. Your scene.</span><small>Start your camera to preview a background</small></div>}
+    {backgroundError && <p className={styles.error} role="alert">{backgroundError}</p>}
+  </div>;
+}

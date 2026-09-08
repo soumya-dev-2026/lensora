@@ -18,8 +18,8 @@ export class PersonSegmenter {
     this.segmenter = await ImageSegmenter.createFromOptions(vision, {
       baseOptions: { modelAssetPath: MODEL_URL, delegate: 'GPU' },
       runningMode: 'VIDEO',
-      outputCategoryMask: true,
-      outputConfidenceMasks: false,
+      outputCategoryMask: false,
+      outputConfidenceMasks: true,
     });
   }
 
@@ -28,12 +28,14 @@ export class PersonSegmenter {
 
     let mask: PersonMask | null = null;
     this.segmenter.segmentForVideo(video, timestamp, (result) => {
-      const categoryMask = result.categoryMask;
-      if (!categoryMask) return;
+      // The selfie model has one confidence channel: 1 = person, 0 = background.
+      // Category labels are class IDs, not an opacity mask.
+      const confidence = result.confidenceMasks?.[0];
+      if (!confidence) return;
       mask = {
-        data: new Uint8Array(categoryMask.getAsUint8Array()),
-        width: categoryMask.width,
-        height: categoryMask.height,
+        data: Uint8Array.from(confidence.getAsFloat32Array(), (value) => Math.round(value * 255)),
+        width: confidence.width,
+        height: confidence.height,
       };
     });
     return mask;
