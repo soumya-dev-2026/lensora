@@ -4,6 +4,7 @@ import { CameraPreview } from './components/CameraPreview';
 import { BackgroundPicker, BACKGROUNDS } from './components/BackgroundPicker';
 import { Modal } from './components/Modal';
 import { BackgroundSelection, CanvasLayout } from './types/camera';
+import { RecordingAudio } from './recording/RecordingAudio';
 import { getMp4MimeType } from './recording/mp4';
 import { CameraFilters } from './components/CameraFilters';
 import { DEFAULT_FILTERS, FaceTrackingState } from './types/filters';
@@ -31,6 +32,11 @@ function App() {
   const [fileName, setFileName] = useState('background-video');
   const [savedClip, setSavedClip] = useState<Blob | null>(null);
   const [saveOpen, setSaveOpen] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const [micMuted, setMicMuted] = useState(false);
+  const [micPending, setMicPending] = useState(false);
+  const micReady = useRef(false);
+  const audioRef = useRef(new RecordingAudio());
   const [clipUrl, setClipUrl] = useState('');
   const [elapsed, setElapsed] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
@@ -68,7 +74,23 @@ function App() {
     return () => window.clearInterval(timer);
   }, [recordingState]);
 
+  useEffect(() => {
+    let cancelled = false;
+    micReady.current = false;
+    if (!isActive) { audioRef.current.mute(); setMicMuted(false); setMicPending(false); return; }
+    setMicPending(true);
+    void audioRef.current.unmute().then((enabled) => {
+      if (!cancelled) setMicMuted(!enabled);
+    }).catch(() => {
+      if (!cancelled) { setMicMuted(true); setRecordingError('Microphone access was denied or unavailable. Recording will be muted.'); }
+    }).finally(() => {
+      if (!cancelled) { micReady.current = true; setMicPending(false); }
+    });
+    return () => { cancelled = true; audioRef.current.mute(); };
+  }, [isActive]);
+
   useEffect(() => () => {
+    audioRef.current.dispose();
     const recorder = recorderRef.current;
     if (recorder) {
       recorder.onstop = null;
@@ -84,8 +106,9 @@ function App() {
     try {
       const canvas = canvasRef.current;
       if (!canvas || !window.MediaRecorder || !canvas.captureStream) throw new Error('Video recording is unavailable in this browser.');
-      const mimeType = getMp4MimeType((type) => MediaRecorder.isTypeSupported(type));
+      const mimeType = getMp4MimeType((type) => MediaRecorder.isTypeSupported(type), true);
       stream = canvas.captureStream(30);
+      stream.addTrack(audioRef.current.recordingTrack());
       const recorder = new MediaRecorder(stream, { mimeType });
       const chunks: Blob[] = [];
       recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
@@ -116,7 +139,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (pendingStart.current && isActive && processing === 'ready') {
+    if (pendingStart.current && isActive && processing === 'ready' && micReady.current) {
       pendingStart.current = false;
       beginRecording();
     }
@@ -129,12 +152,15 @@ function App() {
         recorder.stop();
       }
     }
-  }, [isActive, processing, error, beginRecording]);
+  }, [isActive, processing, error, beginRecording, micPending]);
 
   const record = async () => {
     if (savedClip) { setSaveOpen(true); return; }
     setRecordingError(null);
-    if (isActive && processing === 'ready') { beginRecording(); return; }
+    setRecordingState('starting');
+    try { await audioRef.current.resume(); }
+    catch { setRecordingError('Audio recording is unavailable in this browser.'); setRecordingState('idle'); return; }
+    if (isActive && processing === 'ready' && micReady.current) { beginRecording(); return; }
     pendingStart.current = true;
     setRecordingState('starting');
     if (!isActive) await startCamera();
@@ -171,6 +197,25 @@ function App() {
     link.remove();
     setSaveOpen(false);
   };
+  const requestDiscard = () => { setSaveOpen(false); setDiscardOpen(true); };
+  const cancelDiscard = () => { setDiscardOpen(false); setSaveOpen(true); };
+  const discard = async () => {
+    setDiscardOpen(false);
+    setSaveOpen(false);
+    setSavedClip(null);
+    setElapsed(0);
+    setRecordingError(null);
+    stopCamera();
+    await startCamera({ facingMode });
+  };
+  const toggleMicrophone = async () => {
+    if (!micMuted) { audioRef.current.mute(); setMicMuted(true); return; }
+    setMicPending(true);
+    try {
+      if (await audioRef.current.unmute()) { setMicMuted(false); setRecordingError(null); }
+    } catch { setRecordingError('Microphone unavailable. Allow microphone access to record audio.'); }
+    finally { setMicPending(false); }
+  };
   const toggleFullscreen = async () => {
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
@@ -188,6 +233,7 @@ function App() {
     </div>}
     <div className="top-left">
       <BackgroundPicker selected={background} onSelect={setBackground} blur={blur} tint={tint} onBlur={setBlur} onTint={setTint} />
+      <a className="icon-button glass" href="/editor" aria-disabled={busy} onClick={(event) => { if (busy) event.preventDefault(); }} aria-label="Open video editor" title="Video editor"><Icon name="edit" /></a>
       <CameraFilters value={filters} onChange={setFilters} faceState={faceState} />
     </div>
     <div className="top-right">
@@ -199,8 +245,9 @@ function App() {
       {message && <p role="alert">{message}</p>}
       {processing === 'loading' && <p>Preparing your camera and background…</p>}
       {isActive && processing === 'error' && !busy && <button className="icon-button glass" aria-label="Reset camera" title="Reset camera" onClick={stopCamera}><Icon name="reset" /></button>}
-      {savedClip && !saveOpen && <div className="clip-actions"><button className="icon-button glass" aria-label="Review and save video" title="Review and save video" onClick={() => setSaveOpen(true)}><Icon name="download" /></button><button className="icon-button glass" aria-label="New recording" title="New recording" onClick={() => { setSavedClip(null); setElapsed(0); }}><Icon name="plus" /></button></div>}
+      {savedClip && !saveOpen && !discardOpen && <div className="clip-actions"><button className="icon-button glass" aria-label="Review and save video" title="Review and save video" onClick={() => setSaveOpen(true)}><Icon name="download" /></button><button className="icon-button glass" aria-label="New recording" title="New recording" onClick={requestDiscard}><Icon name="plus" /></button></div>}
     </div>
+    <button className="icon-button glass microphone-toggle" aria-label={micMuted ? 'Unmute microphone' : 'Mute microphone'} title={micMuted ? 'Unmute microphone' : 'Mute microphone'} aria-pressed={!micMuted} disabled={!isActive || micPending || recordingState === 'stopping'} onClick={() => void toggleMicrophone()}><Icon name={micMuted ? 'micOff' : 'mic'} /></button>
     <div className="record-controls">
       <button className="icon-button glass camera-toggle" aria-label={isActive ? 'Camera off' : 'Start camera'} title={isActive ? 'Camera off' : 'Start camera'} disabled={!isSupported || busy} onClick={() => isActive ? stopCamera() : void startCamera()}><Icon name={isActive ? 'cameraOff' : 'camera'} /></button>
       {recordingState === 'recording' || recordingState === 'paused' ? <>
@@ -219,11 +266,18 @@ function App() {
         </button>)}
       </div>
     </Modal>}
-    {saveOpen && savedClip && <Modal title="Your video is ready" onClose={() => setSaveOpen(false)}>
+    {saveOpen && savedClip && <Modal title="Your video is ready" onClose={requestDiscard}>
       {clipUrl && <video className="recorded-preview" src={clipUrl} controls playsInline />}
-      <p className="muted">{formatTime(elapsed)} · {(savedClip.size / 1024 / 1024).toFixed(1)} MB · MP4 · Video only</p>
+      <p className="muted">{formatTime(elapsed)} · {(savedClip.size / 1024 / 1024).toFixed(1)} MB · MP4</p>
       <label className="filename">File name<input autoFocus value={fileName} maxLength={120} onChange={(event) => setFileName(event.target.value)} placeholder="background-video" /></label>
-      <button className="primary text-icon" disabled={!clipUrl} onClick={save}><Icon name="download" size={18} />Save MP4</button>
+      <div className="dialog-actions"><button className="primary icon-button" aria-label="Save MP4" title="Save MP4" disabled={!clipUrl} onClick={save}><Icon name="download" /></button></div>
+    </Modal>}
+    {discardOpen && savedClip && <Modal title="Delete this recording?" onClose={cancelDiscard}>
+      <p className="confirmation-copy">This will delete the recorded video. Cancel to go back and save it.</p>
+      <div className="dialog-actions">
+        <button autoFocus className="icon-button" aria-label="Cancel, return to save video" title="Cancel" onClick={cancelDiscard}><Icon name="close" /></button>
+        <button className="icon-button danger" aria-label="OK, delete" title="OK, delete" onClick={() => void discard()}><Icon name="trash" /></button>
+      </div>
     </Modal>}
   </div>;
 }

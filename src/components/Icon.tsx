@@ -1,6 +1,21 @@
 import type { ReactNode } from 'react';
 
 const shapes = {
+  volume: <><path d="m11 4-6 5H2v6h3l6 5ZM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" /></>,
+  volumeOff: <><path d="m11 4-6 5H2v6h3l6 5ZM16 9l6 6m0-6-6 6" /></>,
+  edit: <><path d="m4 16-1 5 5-1L21 7l-4-4ZM14 6l4 4M3 3h7M3 7h4" /></>,
+  audio: <><path d="M9 18V5l12-3v14M9 9l12-3" /><ellipse cx="6" cy="18" rx="3" ry="3" /><ellipse cx="18" cy="16" rx="3" ry="3" /></>,
+  crop: <path d="M6 2v16h16M2 6h16v16" />,
+  text: <path d="M4 5V3h16v2M12 3v18m-4 0h8" />,
+  emoji: <><circle cx="12" cy="12" r="9" /><path d="M8 9h.01M16 9h.01M7 14q5 7 10 0" /></>,
+  frame: <><rect x="3" y="3" width="18" height="18" rx="2" /><rect x="6" y="6" width="12" height="12" rx="1" /></>,
+  trim: <><circle cx="5" cy="6" r="3" /><circle cx="5" cy="18" r="3" /><path d="m8 8 13 13M8 16 21 3" /></>,
+  back: <path d="m10 5-7 7 7 7M3 12h18" />,
+  mic: <><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8" /></>,
+  micOff: <><path d="m2 2 20 20M9 5V4a3 3 0 0 1 6 0v7M9 9v3a3 3 0 0 0 5 2M5 10v2a7 7 0 0 0 12 5M19 10v2M12 19v3m-4 0h8" /></>,
+  trash: <><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" /></>,
+  save: <><path d="M4 3h13l4 4v14H3V3ZM7 3v6h10V3M7 21v-8h10v8" /></>,
+  check: <path d="m5 12 4 4L19 6" />,
   image: <><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8" cy="8" r="1" /><path d="m21 15-5-5L5 21M3 16l4-4 4 4" /></>,
   sparkle: <><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z" /><path d="M20 2v4m-2-2h4" /></>,
   sliders: <><path d="M4 7h8m4 0h4M4 17h3m4 0h9" /><circle cx="14" cy="7" r="2" /><circle cx="9" cy="17" r="2" /></>,

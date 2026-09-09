@@ -81,3 +81,17 @@
   .status-area { bottom: 94px; }
   .modal { max-height: calc(100dvh - 24px); padding: 18px; }
 }
+
+.microphone-toggle { position: absolute; z-index: 2; right: max(24px, env(safe-area-inset-right)); bottom: max(44px, env(safe-area-inset-bottom)); }
+.microphone-toggle[aria-pressed=true] { color: #b3ecde; border-color: #b3ecde99; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 22px; }
+.confirmation-copy { font-size: 14px; line-height: 1.6; color: #cbd7de; }
+.danger { background: #b93242; color: white; }
+@media (max-width: 420px) {
+  .microphone-toggle { right: 14px; bottom: 116px; }
+}
+
+.top-left a { color: inherit; text-decoration: none; border: 1px solid #ffffff26; }
+@media (max-width: 600px) { .recording-time { top: max(70px, calc(env(safe-area-inset-top) + 56px)); } }
+
+.top-left a[aria-disabled=true] { opacity: .45; cursor: not-allowed; }

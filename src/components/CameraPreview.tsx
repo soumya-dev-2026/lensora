@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CameraPreviewProps } from '../types/camera';
 import { PersonSegmenter } from '../ai/PersonSegmenter';
+import { SegmentationInput } from '../ai/SegmentationInput';
 import { FaceTracker } from '../ai/FaceTracker';
 import type { FaceFeatures } from '../types/filters';
 import { WebGLCompositor } from '../rendering/WebGLCompositor';
@@ -66,6 +67,7 @@ export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMod
     let lastVideoTime = -1;
     let compositor: WebGLCompositor | undefined;
     const segmenter = new PersonSegmenter();
+    const segmentationInput = new SegmentationInput();
     onProcessingState?.('loading');
     const fail = (error: unknown) => {
       if (!cancelled) onProcessingState?.('error', error instanceof Error ? error.message : 'Camera processing failed.');
@@ -91,14 +93,14 @@ export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMod
             const video = videoRef.current;
             if (video && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
               lastVideoTime = video.currentTime;
-              const mask = segmenter.segment(video, time);
+              const mask = segmenter.segment(segmentationInput.capture(video), time);
               if (mask) {
                 const effect = settings.current;
                 let face: FaceFeatures | null = null;
                 const tracker = trackerRef.current;
                 if (tracker) {
                   try {
-                    face = tracker.detect(video, time);
+                    face = tracker.detect(segmentationInput.frame, time);
                     onFaceTrackingState(face ? 'tracking' : 'no-face');
                   } catch {
                     tracker.dispose();
@@ -106,7 +108,7 @@ export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMod
                     onFaceTrackingState('error');
                   }
                 }
-                compositor!.render(video, mask.data, mask.width, mask.height, facingMode === 'user', effect.background.kind === 'blur', effect.blur, effect.tint, effect.filters, mask.regions, face);
+                compositor!.render(segmentationInput.frame, mask.data, mask.width, mask.height, facingMode === 'user', effect.background.kind === 'blur', effect.blur, effect.tint, effect.filters, mask.regions, face);
                 if (!ready) { ready = true; onProcessingState?.('ready'); }
               }
             }

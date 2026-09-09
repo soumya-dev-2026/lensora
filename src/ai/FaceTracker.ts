@@ -50,11 +50,11 @@ export class FaceTracker {
     });
   }
 
-  detect(video: HTMLVideoElement, timestamp: number): FaceFeatures | null {
+  detect(video: HTMLVideoElement | HTMLCanvasElement, timestamp: number): FaceFeatures | null {
     const points = this.tracker?.detectForVideo(video, timestamp).faceLandmarks[0];
     if (!points || !this.context) return null;
     const width = 512;
-    const height = Math.max(1, Math.round(width * video.videoHeight / video.videoWidth));
+    const height = Math.max(1, Math.round(width * ('videoHeight' in video ? video.videoHeight / video.videoWidth : video.height / video.width)));
     if (this.canvas.width !== width || this.canvas.height !== height) {
       this.canvas.width = width;
       this.canvas.height = height;
@@ -97,13 +97,13 @@ export class FaceTracker {
     return { mask: this.canvas, eyes };
   }
 
-  private eyeBounds(points: NormalizedLandmark[], video: HTMLVideoElement): [number, number, number, number] {
+  private eyeBounds(points: NormalizedLandmark[], video: HTMLVideoElement | HTMLCanvasElement): [number, number, number, number] {
     const xs = points.map((p) => p.x);
     const ys = points.map((p) => p.y);
     const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
     const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
     // Circular falloff in camera pixels remains stable when the head tilts.
-    const aspect = video.videoWidth / video.videoHeight;
+    const aspect = ('videoWidth' in video ? video.videoWidth / video.videoHeight : video.width / video.height);
     const radiusX = Math.max(...points.map((p) => Math.hypot(p.x - centerX, (p.y - centerY) / aspect))) * 1.7;
     return [centerX, centerY, Math.max(radiusX, 0.001), Math.max(radiusX * aspect, 0.001)];
   }

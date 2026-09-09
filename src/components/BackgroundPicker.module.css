@@ -12,3 +12,7 @@
 .upload input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .upload:focus-within { outline: 2px solid #b1eee0; outline-offset: 4px; border-radius: 4px; }
 .editActions button { width: 34px; height: 34px; background: transparent; }
+
+.editActions { justify-content: flex-end; }
+.editActions .upload { width: 44px; height: 44px; padding: 0; justify-content: center; border-radius: 50%; background: #ffffff06; }
+.editActions button { width: 44px; height: 44px; }

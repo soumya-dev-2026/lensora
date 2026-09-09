@@ -7,27 +7,43 @@ const MODEL_URL =
 const PERSON_CLASSES = [1, 2, 3, 4];
 
 // Only grow face support far enough to cover attached eyewear, not room objects.
-export function nearbyFace(face: Float32Array, width: number, height: number): Float32Array {
+export function nearbyFace(face: Float32Array, width: number, height: number,
+  horizontal = new Float32Array(face.length), expanded = new Float32Array(face.length),
+  deque = new Int32Array(Math.max(width, height))): Float32Array {
   const radius = Math.max(1, Math.round(Math.min(width, height) * 0.025));
-  const horizontal = new Float32Array(face.length);
-  const expanded = new Float32Array(face.length);
-  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-    let value = 0;
-    for (let dx = -radius; dx <= radius; dx++) value = Math.max(value, face[y * width + Math.min(width - 1, Math.max(0, x + dx))]);
-    horizontal[y * width + x] = value;
+  // A monotonic deque visits each pixel once per axis instead of repeatedly
+  // scanning a neighborhood. The result is identical to the old max filter.
+  for (let y = 0; y < height; y++) {
+    let head = 0, tail = 0, next = 0;
+    const row = y * width;
+    for (let x = 0; x < width; x++) {
+      while (next <= Math.min(width - 1, x + radius)) {
+        while (tail > head && face[row + deque[tail - 1]] <= face[row + next]) tail--;
+        deque[tail++] = next++;
+      }
+      while (deque[head] < x - radius) head++;
+      horizontal[row + x] = face[row + deque[head]];
+    }
   }
-  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-    let value = 0;
-    for (let dy = -radius; dy <= radius; dy++) value = Math.max(value, horizontal[Math.min(height - 1, Math.max(0, y + dy)) * width + x]);
-    expanded[y * width + x] = value;
+  for (let x = 0; x < width; x++) {
+    let head = 0, tail = 0, next = 0;
+    for (let y = 0; y < height; y++) {
+      while (next <= Math.min(height - 1, y + radius)) {
+        while (tail > head && horizontal[deque[tail - 1] * width + x] <= horizontal[next * width + x]) tail--;
+        deque[tail++] = next++;
+      }
+      while (deque[head] < y - radius) head++;
+      expanded[y * width + x] = horizontal[deque[head] * width + x];
+    }
   }
   return expanded;
 }
 
 export function temporalWeight(delta: number, elapsed: number): number {
-  // Suppress small confidence fluctuations; follow real motion without trails.
-  const movement = Math.min(1, Math.max(0, (Math.abs(delta) - 0.08) / 0.35));
-  const current = 0.45 + 0.5 * movement;
+  // Smooth only small confidence fluctuations. Moving edges use the current
+  // mask immediately, including at high camera frame rates.
+  const movement = Math.min(1, Math.max(0, (Math.abs(delta) - 0.04) / 0.16));
+  const current = 0.45 + 0.55 * movement;
   return 1 - Math.pow(1 - current, Math.min(3, Math.max(0.25, elapsed / (1000 / 30))));
 }
 
@@ -43,6 +59,12 @@ export class PersonSegmenter {
   private previousMask: Float32Array | null = null;
   private previousRegions: Float32Array | null = null;
   private lastTimestamp = 0;
+  private currentMask = new Float32Array(0);
+  private currentRegions = new Float32Array(0);
+  private faceHorizontal = new Float32Array(0);
+  private faceExpanded = new Float32Array(0);
+  private faceDeque = new Int32Array(0);
+  private weights = new Float32Array(256);
   private maskWidth = 0;
   private maskHeight = 0;
 
@@ -56,7 +78,7 @@ export class PersonSegmenter {
     });
   }
 
-  segment(video: HTMLVideoElement, timestamp: number): PersonMask | null {
+  segment(video: HTMLVideoElement | HTMLCanvasElement, timestamp: number): PersonMask | null {
     if (!this.segmenter) return null;
 
     let mask: PersonMask | null = null;
@@ -66,21 +88,34 @@ export class PersonSegmenter {
         throw new Error('The person model did not return the expected six segmentation classes.');
       }
       const confidence = confidences[0];
-      const current = new Float32Array(confidence.width * confidence.height);
+      const pixels = confidence.width * confidence.height;
+      if (this.currentMask.length !== pixels) {
+        this.currentMask = new Float32Array(pixels);
+        this.currentRegions = new Float32Array(pixels * 2);
+        this.faceHorizontal = new Float32Array(pixels);
+        this.faceExpanded = new Float32Array(pixels);
+      }
+      if (this.faceDeque.length < Math.max(confidence.width, confidence.height)) {
+        this.faceDeque = new Int32Array(Math.max(confidence.width, confidence.height));
+      }
+      const current = this.currentMask;
+      const currentRegions = this.currentRegions;
+      current.fill(0);
+      currentRegions.fill(0);
       const regions = new Uint8Array(current.length * 2);
-      const currentRegions = new Float32Array(regions.length);
       // Sum only person probabilities, preserving soft boundaries between body
       // parts. Accessory confidence is allowed only close to detected face skin.
+      const channels = confidences.map((channel) => channel.getAsFloat32Array());
       for (const category of PERSON_CLASSES) {
-        const values = confidences[category].getAsFloat32Array();
+        const values = channels[category];
         for (let i = 0; i < current.length; i++) {
           current[i] += values[i];
           if (category === 1) currentRegions[i * 2 + 1] = values[i];
           if (category === 2 || category === 3) currentRegions[i * 2] += values[i];
         }
       }
-      const faceSupport = nearbyFace(confidences[3].getAsFloat32Array(), confidence.width, confidence.height);
-      const accessories = confidences[5].getAsFloat32Array();
+      const faceSupport = nearbyFace(channels[3], confidence.width, confidence.height, this.faceHorizontal, this.faceExpanded, this.faceDeque);
+      const accessories = channels[5];
       for (let i = 0; i < current.length; i++) {
         const support = Math.min(1, Math.max(0, (faceSupport[i] - 0.15) / 0.5));
         current[i] = Math.min(1, current[i] + accessories[i] * support);
@@ -93,12 +128,14 @@ export class PersonSegmenter {
         this.maskWidth = confidence.width;
         this.maskHeight = confidence.height;
       } else {
+        // Evaluate the expensive time-based exponent only 256 times per frame.
+        for (let i = 0; i < this.weights.length; i++) this.weights[i] = temporalWeight(i / 255, elapsed);
         for (let i = 0; i < current.length; i++) {
-          const weight = temporalWeight(current[i] - this.previousMask[i], elapsed);
+          const weight = this.weights[Math.min(255, Math.round(Math.abs(current[i] - this.previousMask[i]) * 255))];
           this.previousMask[i] += (current[i] - this.previousMask[i]) * weight;
         }
         for (let i = 0; i < currentRegions.length; i++) {
-          const weight = temporalWeight(currentRegions[i] - this.previousRegions[i], elapsed);
+          const weight = this.weights[Math.min(255, Math.round(Math.abs(currentRegions[i] - this.previousRegions[i]) * 255))];
           this.previousRegions[i] += (currentRegions[i] - this.previousRegions[i]) * weight;
         }
       }

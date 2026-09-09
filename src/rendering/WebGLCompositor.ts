@@ -293,7 +293,9 @@ export class WebGLCompositor {
     gl.deleteProgram(this.program);
   }
 
-  render(video: HTMLVideoElement, mask: Uint8Array, maskWidth: number, maskHeight: number, mirror: boolean, liveBackground = false, blur = 0, tint = 0, filters?: CameraFilters, regions?: Uint8Array, face?: FaceFeatures | null): void {
+  render(video: HTMLVideoElement | HTMLCanvasElement, mask: Uint8Array, maskWidth: number, maskHeight: number, mirror: boolean, liveBackground = false, blur = 0, tint = 0, filters?: CameraFilters, regions?: Uint8Array, face?: FaceFeatures | null): void {
+    const sourceWidth = 'videoWidth' in video ? video.videoWidth : video.width;
+    const sourceHeight = 'videoHeight' in video ? video.videoHeight : video.height;
     const { gl } = this;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.useProgram(this.program);
@@ -301,7 +303,7 @@ export class WebGLCompositor {
       const needsFace = key === 'eyeSize' || key === 'redLips';
       gl.uniform1f(this.filterLocations.get(key)!, filters?.enabled && (!needsFace || face) ? filters[key] / 100 : 0);
     }
-    gl.uniform2f(this.filterLocations.get('cameraTexel')!, 1 / video.videoWidth, 1 / video.videoHeight);
+    gl.uniform2f(this.filterLocations.get('cameraTexel')!, 1 / sourceWidth, 1 / sourceHeight);
     for (let i = 0; i < 2; i++) {
       const eye = face?.eyes[i] ?? [0, 0, 0, 0];
       gl.uniform4f(this.filterLocations.get(`eye${i}`)!, eye[0], eye[1], eye[2], eye[3]);
@@ -309,17 +311,20 @@ export class WebGLCompositor {
     gl.uniform1f(this.blurLocation, blur / 100);
     gl.uniform1f(this.tintLocation, tint / 100);
     gl.uniform1i(this.liveBackgroundLocation, liveBackground ? 1 : 0);
-    gl.uniform2f(this.backgroundTexelLocation, 1 / (liveBackground ? video.videoWidth : this.backgroundWidth), 1 / (liveBackground ? video.videoHeight : this.backgroundHeight));
+    gl.uniform2f(this.backgroundTexelLocation, 1 / (liveBackground ? sourceWidth : this.backgroundWidth), 1 / (liveBackground ? sourceHeight : this.backgroundHeight));
     // Center-crop both sources to fill the output without stretching.
     const outputAspect = this.canvas.width / this.canvas.height;
-    const cameraAspect = video.videoWidth / video.videoHeight;
+    const cameraAspect = sourceWidth / sourceHeight;
     gl.uniform2f(this.cameraScaleLocation, Math.min(1, outputAspect / cameraAspect), Math.min(1, cameraAspect / outputAspect));
     gl.uniform2f(this.backgroundScaleLocation, Math.min(1, outputAspect / this.backgroundAspect), Math.min(1, this.backgroundAspect / outputAspect));
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.cameraTexture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
-    gl.generateMipmap(gl.TEXTURE_2D);
+    // Camera mip levels are only sampled when blurring the live room.
+    const cameraMipmaps = liveBackground && blur > 0;
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, cameraMipmaps ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
+    if (cameraMipmaps) gl.generateMipmap(gl.TEXTURE_2D);
 
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, this.maskTexture);

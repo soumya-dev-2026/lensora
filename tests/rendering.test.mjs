@@ -11,7 +11,7 @@ async function loadModule(path, replacement = (source) => source) {
 }
 
 // Model API fixture, independent of GPU/browser availability.
-const { PersonSegmenter, temporalWeight } = await loadModule('../src/ai/PersonSegmenter.ts', (source) => source.replace(
+const { PersonSegmenter, temporalWeight, nearbyFace } = await loadModule('../src/ai/PersonSegmenter.ts', (source) => source.replace(
   "import { FilesetResolver, ImageSegmenter } from '@mediapipe/tasks-vision';",
   `const FilesetResolver = { forVisionTasks: async () => ({}) };
    const ImageSegmenter = { createFromOptions: async (_, options) => {
@@ -82,7 +82,8 @@ test('moving mask blends confidence once per frame without mutating earlier outp
   assert.deepEqual([...first.data], [0, 255]);
   assert.ok(second.data[0] > 230 && second.data[1] < 25);
   const third = segmenter.segment({ confidence: [1, 0], width: 2 }, 1 + 2000 / 30);
-  assert.ok(third.data[0] > second.data[0] && third.data[1] < second.data[1]);
+  assert.deepEqual([...second.data], [255, 0]);
+  assert.deepEqual([...third.data], [255, 0]);
   // Same pixel count but different dimensions must also reset history.
   const resized = segmenter.segment({ confidence: [0, 1], width: 1, height: 2 }, 101);
   assert.deepEqual([...resized.data], [0, 255]);
@@ -130,6 +131,29 @@ test('beauty-region masks damp jitter and old frames reset after a capture gap',
 });
 
 const { getMp4MimeType } = await loadModule('../src/recording/mp4.ts');
+const { segmentationSize } = await loadModule('../src/ai/SegmentationInput.ts');
+
+test('AI input is bounded independently of output size and preserves camera aspect', () => {
+  assert.deepEqual(segmentationSize(1280, 720), [384, 216]);
+  assert.deepEqual(segmentationSize(720, 1280), [216, 384]);
+  assert.deepEqual(segmentationSize(3840, 2160), [384, 216]);
+  assert.deepEqual(segmentationSize(320, 180), [320, 180]);
+});
+
+test('linear-time face expansion matches the reference neighborhood filter at edges and narrow dimensions', () => {
+  for (const [width, height] of [[1, 9], [9, 1], [3, 5], [82, 85]]) {
+    const input = Float32Array.from({ length: width * height }, (_, i) => ((i * 37 + i * i * 11) % 101) / 100);
+    const actual = nearbyFace(input, width, height);
+    const radius = Math.max(1, Math.round(Math.min(width, height) * 0.025));
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+      let expected = 0;
+      for (let yy = Math.max(0, y - radius); yy <= Math.min(height - 1, y + radius); yy++) {
+        for (let xx = Math.max(0, x - radius); xx <= Math.min(width - 1, x + radius); xx++) expected = Math.max(expected, input[yy * width + xx]);
+      }
+      assert.equal(actual[y * width + x], expected);
+    }
+  }
+});
 
 test('recording chooses MP4 even when WebM is available', () => {
   assert.equal(getMp4MimeType(() => true), 'video/mp4;codecs=avc1.424028');
@@ -237,4 +261,34 @@ test('filter bypass is neutral and lost face disables eye and lip effects on the
   for (const key of Object.keys(DEFAULT_FILTERS).filter((key) => key !== 'enabled')) {
     assert.deepEqual(uniforms.get(`u_${key}`), [0]);
   }
+});
+
+test('camera mipmaps are generated only for live-background blur', () => {
+  const { compositor, calls } = fixture();
+  const video = { videoWidth: 1280, videoHeight: 720 };
+  for (const [live, blur, expected] of [[false, 0, 0], [false, 60, 0], [true, 0, 0], [true, 60, 1]]) {
+    calls.length = 0;
+    compositor.render(video, new Uint8Array(4), 2, 2, false, live, blur);
+    assert.equal(calls.filter(([name]) => name === 'generateMipmap').length, expected);
+  }
+});
+
+test('moving edges follow the current mask at 30, 60 and 120 fps', async () => {
+  for (const fps of [30, 60, 120]) {
+    const segmenter = new PersonSegmenter();
+    await segmenter.initialize();
+    segmenter.segment({ confidence: [0.25, 0.75], width: 2 }, 1);
+    const moved = segmenter.segment({ confidence: [0.75, 0.25], width: 2 }, 1 + 1000 / fps);
+    assert.deepEqual([...moved.data], [191, 64]);
+    segmenter.dispose();
+  }
+});
+
+test('captured camera canvas preserves source aspect and texture dimensions', () => {
+  const { compositor, uniforms, calls } = fixture();
+  const captured = { width: 1280, height: 720 };
+  compositor.render(captured, new Uint8Array(4), 2, 2, true, true);
+  assert.deepEqual(uniforms.get('u_cameraScale'), [0.31640625, 1]);
+  assert.deepEqual(uniforms.get('u_backgroundTexel'), [1 / 1280, 1 / 720]);
+  assert.ok(calls.some(([name, ...args]) => name === 'texImage2D' && args.at(-1) === captured));
 });
