@@ -1,17 +1,14 @@
-.dropdown { position: relative; width: 240px; }
-.dropdown summary { padding: 13px 16px; border-radius: 12px; background: #161d24dd; border: 1px solid #ffffff26; backdrop-filter: blur(20px); cursor: pointer; list-style: none; font-size: 14px; }
-.dropdown summary::-webkit-details-marker { display: none; }
-.dropdown summary span { float: right; }
-.panel { position: absolute; top: calc(100% + 8px); left: 0; width: 340px; max-width: calc(100vw - 32px); max-height: calc(100dvh - 200px); overflow-y: auto; padding: 16px; background: #161d24f5; backdrop-filter: blur(24px); border: 1px solid #ffffff26; border-radius: 16px; box-shadow: 0 16px 48px #0006; display: grid; gap: 14px; }
-.caption { font-size: 10px; letter-spacing: .16em; color: #9caeb8; }
-.effect { display: flex; justify-content: space-between; align-items: center; font-size: 13px; width: 100%; }
-.effect span { color: #a5bdc8; }
-.colorRow { display: flex; align-items: center; gap: 10px; }
-.colorRow button { flex: 1; text-align: left; font-size: 13px; }
-.colorRow input { width: 40px; height: 36px; padding: 2px; background: none; border: 0; cursor: pointer; }
+.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+.modes button { display: flex; align-items: center; justify-content: center; gap: 9px; padding: 13px; font-size: 12px; background: #ffffff06; border-radius: 12px; }
+.modes button[aria-pressed=true], .options button[aria-pressed=true] { border-color: #b3ecde99; color: #b3ecde; background: #b3ecde13; }
+.colorRow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 18px; font-size: 12px; }
+.colorRow input { width: 40px; height: 32px; padding: 2px; background: none; border: 0; cursor: pointer; }
 .options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.options button { padding: 0 0 8px; overflow: hidden; font-size: 11px; text-align: left; }
-.options img { width: 100%; height: 62px; object-fit: cover; display: block; margin-bottom: 7px; }
-.options span, .options small { display: block; padding: 0 6px; }
-.options small { color: #a3b4bd; font-size: 9px; margin-top: 4px; }
-.panel button[aria-pressed=true] { border-color: #97dfd1; background-color: #28443f; }
+.options button { padding: 0 0 10px; overflow: hidden; font-size: 10px; text-align: center; background: #ffffff06; border-radius: 12px; }
+.options img { width: 100%; height: 66px; object-fit: cover; display: block; margin-bottom: 10px; }
+.options span { display: block; padding: 0 4px; }
+.editActions { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 14px; }
+.editActions .upload { position: relative; display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 11px; cursor: pointer; }
+.upload input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.upload:focus-within { outline: 2px solid #b1eee0; outline-offset: 4px; border-radius: 4px; }
+.editActions button { width: 34px; height: 34px; background: transparent; }

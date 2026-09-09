@@ -5,6 +5,9 @@ import { BackgroundPicker, BACKGROUNDS } from './components/BackgroundPicker';
 import { Modal } from './components/Modal';
 import { BackgroundSelection, CanvasLayout } from './types/camera';
 import { getMp4MimeType } from './recording/mp4';
+import { CameraFilters } from './components/CameraFilters';
+import { DEFAULT_FILTERS, FaceTrackingState } from './types/filters';
+import { Icon } from './components/Icon';
 import './App.css';
 
 type RecordingState = 'idle' | 'starting' | 'recording' | 'paused' | 'stopping';
@@ -14,7 +17,10 @@ const formatTime = (ms: number) => {
 };
 
 function App() {
+  const [filters, setFilters] = useState({ ...DEFAULT_FILTERS });
+  const [faceState, setFaceState] = useState<FaceTrackingState>('off');
   const [layout, setLayout] = useState<CanvasLayout>('landscape');
+  const [layoutOpen, setLayoutOpen] = useState(false);
   const [background, setBackground] = useState<BackgroundSelection>({ kind: 'image', value: BACKGROUNDS[0].src });
   const [blur, setBlur] = useState(0);
   const [tint, setTint] = useState(0);
@@ -36,6 +42,7 @@ function App() {
   const startedAt = useRef(0);
   const { videoRef, isActive, facingMode, error, startCamera, stopCamera, switchCamera, isSupported, hasMultipleCameras } = useCamera();
   const busy = recordingState !== 'idle';
+  const showTimer = recordingState === 'recording' || recordingState === 'paused' || recordingState === 'stopping';
 
   const handleProcessingState = useCallback((state: typeof processing, message?: string) => {
     setProcessing(state);
@@ -174,44 +181,49 @@ function App() {
 
   return <div className="studio" ref={studioRef}>
     <main className="stage" aria-label="Camera studio">
-      <CameraPreview layout={layout} videoRef={videoRef} canvasRef={canvasRef} isActive={isActive} facingMode={facingMode} background={background} blur={blur} tint={tint} onProcessingState={handleProcessingState} />
+      <CameraPreview layout={layout} videoRef={videoRef} canvasRef={canvasRef} isActive={isActive} facingMode={facingMode} background={background} blur={blur} tint={tint} filters={filters} onFaceTrackingState={setFaceState} onProcessingState={handleProcessingState} />
     </main>
+    {showTimer && <div className={`recording-time ${recordingState === 'recording' ? 'live' : ''}`} role="timer" aria-label={`${recordingState === 'paused' ? 'Paused' : 'Recording time'} ${formatTime(elapsed)}`}>
+      {recordingState === 'paused' ? <Icon name="pause" size={12} /> : <i aria-hidden="true" />}{formatTime(elapsed)}
+    </div>}
     <div className="top-left">
-      <div className={`recording-time ${recordingState === 'recording' ? 'live' : ''}`} role="timer" aria-label={`Recording time ${formatTime(elapsed)}`}><i />{formatTime(elapsed)}<span>{recordingState === 'paused' ? 'PAUSED' : recordingState === 'recording' ? 'REC' : 'STUDIO'}</span></div>
       <BackgroundPicker selected={background} onSelect={setBackground} blur={blur} tint={tint} onBlur={setBlur} onTint={setTint} />
+      <CameraFilters value={filters} onChange={setFilters} faceState={faceState} />
     </div>
     <div className="top-right">
-      <label className="layout-control"><span className="sr-only">Canvas orientation</span><select aria-label="Canvas orientation" value={layout} disabled={busy} onChange={(event) => setLayout(event.target.value as CanvasLayout)}><option value="landscape">Landscape · 16:9</option><option value="portrait">Portrait · 9:16</option></select></label>
-      <button className="glass" aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} onClick={() => void toggleFullscreen()}>⛶</button>
+      <button className="icon-button glass" aria-label="Canvas orientation" title="Canvas orientation" aria-haspopup="dialog" disabled={busy} onClick={() => setLayoutOpen(true)}><Icon name={layout} /></button>
+      <button className="icon-button glass" aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} title={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} onClick={() => void toggleFullscreen()}><Icon name={fullscreen ? 'collapse' : 'expand'} /></button>
     </div>
     <div className="status-area" aria-live="polite">
       {!isSupported && <p role="alert">Camera access is unavailable. Open this app over HTTPS in a camera-capable browser.</p>}
       {message && <p role="alert">{message}</p>}
       {processing === 'loading' && <p>Preparing your camera and background…</p>}
-      {!isActive && isSupported && recordingState === 'idle' && <button className="primary" onClick={() => void startCamera()}>Start camera</button>}
-      {isActive && processing === 'error' && !busy && <button onClick={stopCamera}>Reset camera</button>}
-      {savedClip && !saveOpen && <div className="clip-actions"><button onClick={() => setSaveOpen(true)}>Review & save video</button><button onClick={() => { setSavedClip(null); setElapsed(0); }}>New recording</button></div>}
+      {isActive && processing === 'error' && !busy && <button className="icon-button glass" aria-label="Reset camera" title="Reset camera" onClick={stopCamera}><Icon name="reset" /></button>}
+      {savedClip && !saveOpen && <div className="clip-actions"><button className="icon-button glass" aria-label="Review and save video" title="Review and save video" onClick={() => setSaveOpen(true)}><Icon name="download" /></button><button className="icon-button glass" aria-label="New recording" title="New recording" onClick={() => { setSavedClip(null); setElapsed(0); }}><Icon name="plus" /></button></div>}
     </div>
-    <div className="bottom-left"><span className="brand">BACKGROUND STUDIO</span><small>Processed on your device</small></div>
     <div className="record-controls">
+      <button className="icon-button glass camera-toggle" aria-label={isActive ? 'Camera off' : 'Start camera'} title={isActive ? 'Camera off' : 'Start camera'} disabled={!isSupported || busy} onClick={() => isActive ? stopCamera() : void startCamera()}><Icon name={isActive ? 'cameraOff' : 'camera'} /></button>
       {recordingState === 'recording' || recordingState === 'paused' ? <>
-        <button className="record-small pause" aria-label={recordingState === 'paused' ? 'Resume recording' : 'Pause recording'} onClick={pauseOrResume}>{recordingState === 'paused' ? '▶' : 'Ⅱ'}</button>
-        <button className="record-small stop" aria-label="Stop recording" onClick={stop}><span /></button>
-        <span className="record-caption">{recordingState === 'paused' ? 'Resume' : 'Pause'} / Stop</span>
+        <button className="record-small pause" aria-label={recordingState === 'paused' ? 'Resume recording' : 'Pause recording'} title={recordingState === 'paused' ? 'Resume recording' : 'Pause recording'} onClick={pauseOrResume}><Icon name={recordingState === 'paused' ? 'play' : 'pause'} /></button>
+        <button className="record-small stop" aria-label="Stop recording" title="Stop recording" onClick={stop}><Icon name="stop" /></button>
       </> : <>
-        <button className="record-button" aria-label={savedClip ? "Review recording" : "Start recording"} disabled={!isSupported || busy || (isActive && processing === 'error')} onClick={() => void record()}><span /></button>
-        <span className="record-caption">{recordingState === 'starting' ? 'Getting ready…' : recordingState === 'stopping' ? 'Finishing…' : savedClip ? 'Review recording' : 'Record'}</span>
+        <button className="record-button" aria-label={savedClip ? 'Review recording' : 'Start recording'} title={savedClip ? 'Review recording' : 'Start recording'} disabled={!isSupported || busy || (isActive && processing === 'error')} onClick={() => void record()}>{savedClip ? <Icon name="play" size={26} /> : <span />}</button>
       </>}
+      {hasMultipleCameras && <button className="icon-button glass camera-switch" aria-label="Switch camera" title="Switch camera" disabled={!isActive || busy} onClick={() => void switchCamera()}><Icon name="switchCamera" /></button>}
+      {(recordingState === 'starting' || recordingState === 'stopping') && <span className="record-caption" role="status">{recordingState === 'starting' ? 'Getting ready…' : 'Finishing…'}</span>}
     </div>
-    <div className="bottom-right">
-      {hasMultipleCameras && <button className="glass" disabled={!isActive || busy} onClick={() => void switchCamera()}>Switch camera</button>}
-      {isActive && <button className="glass" disabled={busy} onClick={stopCamera}>Camera off</button>}
-    </div>
+    {layoutOpen && <Modal title="Canvas orientation" onClose={() => setLayoutOpen(false)}>
+      <div className="orientation-options" role="group" aria-label="Canvas orientation">
+        {(['landscape', 'portrait'] as const).map((option) => <button key={option} disabled={busy} aria-pressed={layout === option} onClick={() => { setLayout(option); setLayoutOpen(false); }}>
+          <Icon name={option} size={36} /><span>{option === 'landscape' ? 'Landscape' : 'Portrait'}</span><small>{option === 'landscape' ? '16:9' : '9:16'}</small>
+        </button>)}
+      </div>
+    </Modal>}
     {saveOpen && savedClip && <Modal title="Your video is ready" onClose={() => setSaveOpen(false)}>
       {clipUrl && <video className="recorded-preview" src={clipUrl} controls playsInline />}
       <p className="muted">{formatTime(elapsed)} · {(savedClip.size / 1024 / 1024).toFixed(1)} MB · MP4 · Video only</p>
       <label className="filename">File name<input autoFocus value={fileName} maxLength={120} onChange={(event) => setFileName(event.target.value)} placeholder="background-video" /></label>
-      <button className="primary" disabled={!clipUrl} onClick={save}>Save MP4</button>
+      <button className="primary text-icon" disabled={!clipUrl} onClick={save}><Icon name="download" size={18} />Save MP4</button>
     </Modal>}
   </div>;
 }

@@ -1,0 +1,37 @@
+import type { ReactNode } from 'react';
+
+const shapes = {
+  image: <><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8" cy="8" r="1" /><path d="m21 15-5-5L5 21M3 16l4-4 4 4" /></>,
+  sparkle: <><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z" /><path d="M20 2v4m-2-2h4" /></>,
+  sliders: <><path d="M4 7h8m4 0h4M4 17h3m4 0h9" /><circle cx="14" cy="7" r="2" /><circle cx="9" cy="17" r="2" /></>,
+  sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" /></>,
+  smooth: <><path d="M7 3h10l2 5-1 8-6 5-6-5-1-8 2-5Z" /><path d="M8 10h1m6 0h1m-7 5q3 2 6 0" /></>,
+  eye: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></>,
+  lips: <><path d="M2 12c4-2 6-6 10-3 4-3 6 1 10 3-3 5-6 7-10 7S5 17 2 12Z" /><path d="M2 12q10 4 20 0" /></>,
+  hair: <><path d="M4 20V10a8 8 0 0 1 16 0v10M4 13c5 0 9-5 10-10m-2 6c1 3 4 5 8 5M8 15v5m8-4v4" /></>,
+  temperature: <><path d="M10 14.8V5a3 3 0 0 1 6 0v9.8a5 5 0 1 1-6 0ZM13 9v9m6-12h2m-2 4h2" /></>,
+  saturation: <><path d="M12 2C10 6 4 11 4 15a8 8 0 0 0 16 0c0-4-6-9-8-13Z" /><path d="M8 15a4 4 0 0 0 4 4" /></>,
+  contrast: <><circle cx="12" cy="12" r="9" /><path d="M12 3a9 9 0 0 1 0 18Z" fill="currentColor" /></>,
+  blur: <><path d="M4 6h16M2 10h20M4 14h16M7 18h10" strokeDasharray="1 3" /></>,
+  palette: <><path d="M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1-3.7 1.5 1.5 0 0 1 1-2.8h2a4 4 0 0 0 4-4C21 6 17 3 12 3Z" /><path d="M7 10h.01M10 7h.01M15 7h.01M17 10h.01" strokeWidth="3" /></>,
+  landscape: <rect x="2" y="5" width="20" height="14" rx="2" />,
+  portrait: <rect x="5" y="2" width="14" height="20" rx="2" />,
+  expand: <path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" />,
+  collapse: <path d="M3 8h5V3m8 0v5h5M8 21v-5H3m18 0h-5v5" />,
+  close: <path d="m6 6 12 12M6 18 18 6" />,
+  camera: <><path d="m8 5 2-2h4l2 2h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" /><circle cx="12" cy="13" r="4" /></>,
+  cameraOff: <><path d="m2 2 20 20M9 5l1-2h4l2 2h4a2 2 0 0 1 2 2v10M3 6a2 2 0 0 0-1 1v12a2 2 0 0 0 2 2h15M9 10a4 4 0 0 0 5 6" /></>,
+  switchCamera: <><path d="M3 9a9 9 0 0 1 15-5l3 3M21 2v5h-5M21 15A9 9 0 0 1 6 20l-3-3M3 22v-5h5" /><circle cx="12" cy="12" r="3" /></>,
+  play: <path d="m8 4 12 8-12 8Z" fill="currentColor" />,
+  pause: <><path d="M8 5v14M16 5v14" strokeWidth="4" /></>,
+  stop: <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />,
+  reset: <><path d="M3 10a9 9 0 1 1 2 8M3 4v6h6" /></>,
+  upload: <><path d="M12 16V3m-5 5 5-5 5 5M4 16v5h16v-5" /></>,
+  download: <><path d="M12 3v13m-5-5 5 5 5-5M4 16v5h16v-5" /></>,
+  plus: <path d="M12 5v14M5 12h14" />,
+} satisfies Record<string, ReactNode>;
+
+export type IconName = keyof typeof shapes;
+export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">{shapes[name]}</svg>;
+}

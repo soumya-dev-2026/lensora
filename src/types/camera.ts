@@ -1,6 +1,7 @@
 /**
  * Camera-related type definitions
  */
+import { CameraFilters, FaceTrackingState } from './filters';
 
 export interface CameraOptions {
   facingMode: 'user' | 'environment';
@@ -54,6 +55,8 @@ export interface CameraPreviewProps {
   background: BackgroundSelection;
   blur: number;
   tint: number;
+  filters: CameraFilters;
+  onFaceTrackingState: (state: FaceTrackingState) => void;
   onProcessingState?: (state: 'idle' | 'loading' | 'ready' | 'error', message?: string) => void;
 }
 

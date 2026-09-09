@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { BackgroundSelection } from '../types/camera';
 import { Modal } from './Modal';
+import { Icon } from './Icon';
 import styles from './BackgroundPicker.module.css';
 
 export const BACKGROUNDS = [
@@ -20,6 +21,7 @@ interface Props {
 
 export function BackgroundPicker({ selected, onSelect, blur, tint, onBlur, onTint }: Props) {
   const [presets, setPresets] = useState(BACKGROUNDS);
+  const [open, setOpen] = useState(false);
   const [editor, setEditor] = useState<number | 'blur' | null>(null);
   const [uploadError, setUploadError] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -55,44 +57,42 @@ export function BackgroundPicker({ selected, onSelect, blur, tint, onBlur, onTin
     finally { URL.revokeObjectURL(url); setUploading(false); }
   };
   const sliders = <div className="sliders">
-    <label htmlFor="blur">Background blur <output>{blur}%</output></label>
+    <label htmlFor="blur">Background blur <output aria-hidden="true">{blur}%</output></label>
     <input id="blur" type="range" min="0" max="100" value={blur} onChange={(event) => onBlur(Number(event.target.value))} />
-    <label htmlFor="tint">Black tint opacity <output>{tint}%</output></label>
+    <label htmlFor="tint">Darken background <output aria-hidden="true">{tint}%</output></label>
     <input id="tint" type="range" min="0" max="100" value={tint} onChange={(event) => onTint(Number(event.target.value))} />
   </div>;
   return <>
-    <details className={styles.dropdown}>
-      <summary>✦ Background filters <span>⌄</span></summary>
-      <div className={styles.panel}>
-        <p className={styles.caption}>MAKE IT YOUR SPACE</p>
-        <button className={styles.effect} aria-pressed={selected.kind === 'blur'} onClick={() => { onSelect({ kind: 'blur', value: '' }); if (selected.kind !== 'blur' && blur === 0) onBlur(35); setEditor('blur'); }}>◉ Blur & tint <span>Adjust →</span></button>
-        <div className={styles.colorRow}>
-          <button aria-pressed={selected.kind === 'color'} onClick={() => onSelect({ kind: 'color', value: color })}>Solid color</button>
+    <button className="icon-button glass" aria-label="Background filters" title="Background filters" aria-haspopup="dialog" onClick={() => {
+      setOpen(true);
+      setUploadError('');
+      const index = presets.findIndex((preset) => selected.kind === 'image' && selected.value === preset.src);
+      setEditor(index >= 0 ? index : 'blur');
+    }}><Icon name="image" /></button>
+    {open && <Modal title="Background" onClose={() => { if (!uploading) setOpen(false); }}>
+      <div className={styles.modes} role="group" aria-label="Background type">
+        <button disabled={uploading} aria-pressed={selected.kind === 'blur'} onClick={() => { onSelect({ kind: 'blur', value: '' }); if (selected.kind !== 'blur' && blur === 0) onBlur(35); setEditor('blur'); }}><Icon name="blur" />Blur</button>
+        <button disabled={uploading} aria-pressed={selected.kind === 'color'} onClick={() => { onSelect({ kind: 'color', value: color }); setEditor('blur'); }}><Icon name="palette" />Color</button>
+      </div>
+      {selected.kind === 'color' && <label className={styles.colorRow}>Background color
           <input aria-label="Background color" type="color" value={color} onChange={(event) => { setColor(event.target.value); onSelect({ kind: 'color', value: event.target.value }); }} />
-        </div>
+      </label>}
         <div className={styles.options}>
-          {presets.map((preset, index) => <button key={preset.id} onClick={() => editPreset(index)} aria-pressed={selected.kind === 'image' && selected.value === preset.src} aria-label={`${preset.name}: select and customize`}>
-            <img src={preset.src} alt="" /><span>{preset.name}</span><small>Edit image ↗</small>
+          {presets.map((preset, index) => <button key={preset.id} disabled={uploading} onClick={() => editPreset(index)} aria-pressed={selected.kind === 'image' && selected.value === preset.src} aria-label={`${preset.name}: select and customize`}>
+            <img src={preset.src} alt="" /><span>{preset.name}</span>
           </button>)}
         </div>
-        <button className={styles.effect} onClick={() => setEditor('blur')}>Adjust current background <span>→</span></button>
-      </div>
-    </details>
-    {editor !== null && <Modal title={typeof editor === 'number' ? presets[editor].name : 'Background blur & tint'} onClose={() => { if (!uploading) setEditor(null); }}>
-      {typeof editor === 'number' && <>
-        <img className="preset-preview" src={presets[editor].src} alt="Selected background" />
-        <label className="upload-label">Replace this preset<input disabled={uploading} type="file" accept="image/png,image/jpeg,image/webp,image/avif" onChange={(event) => { void upload(event.target.files?.[0]); event.target.value = ''; }} /></label>
-        <button disabled={uploading} onClick={() => {
+      {typeof editor === 'number' && <div className={styles.editActions}>
+        <label className={styles.upload}><Icon name="upload" size={17} /><span>Replace image</span><input aria-label="Replace preset image" disabled={uploading} type="file" accept="image/png,image/jpeg,image/webp,image/avif" onChange={(event) => { void upload(event.target.files?.[0]); event.target.value = ''; }} /></label>
+        <button className="icon-button" aria-label="Restore original image" title="Restore original image" disabled={uploading} onClick={() => {
           const preset = BACKGROUNDS[editor];
           setPresets((current) => current.map((item, i) => i === editor ? preset : item));
           onSelect({ kind: 'image', value: preset.src });
-        }}>Restore original image</button>
-        <p className="muted">PNG, JPG, WebP or AVIF · Up to 20 MB · Kept for this session</p>
-      </>}
+        }}><Icon name="reset" size={18} /></button>
+      </div>}
       {sliders}
       {uploading && <p role="status">Preparing image…</p>}
       {uploadError && <p role="alert">{uploadError}</p>}
-      <button className="primary" disabled={uploading} onClick={() => setEditor(null)}>Done</button>
     </Modal>}
   </>;
 }

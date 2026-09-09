@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import ts from 'typescript';
+import { FaceLandmarker } from '@mediapipe/tasks-vision';
 
 async function loadModule(path, replacement = (source) => source) {
   const source = replacement(await readFile(new URL(path, import.meta.url), 'utf8'));
@@ -46,6 +47,7 @@ test('keeps hair, body, face and clothes while rejecting background and other ob
     Array.from({ length: 6 }, (_, pixel) => Number(category === pixel)));
   const result = segmenter.segment({ channels, width: 6 }, 1);
   assert.deepEqual([...result.data], [0, 255, 255, 255, 255, 0]);
+  assert.deepEqual([...result.regions], [0, 0, 0, 255, 255, 0, 255, 0, 0, 0, 0, 0]);
   // Once the person leaves, smoothing must not retain a foreground silhouette.
   const emptyScene = channels.map((channel, category) => channel.map(() => Number(category === 0)));
   const next = segmenter.segment({ channels: emptyScene, width: 6 }, 2);
@@ -99,6 +101,28 @@ test('recording chooses MP4 even when WebM is available', () => {
 });
 
 const { WebGLCompositor } = await loadModule('../src/rendering/WebGLCompositor.ts');
+const { DEFAULT_FILTERS } = await loadModule('../src/types/filters.ts');
+const { contourLoops } = await loadModule('../src/ai/FaceTracker.ts', (source) => source.replace(
+  "import { FaceLandmarker, FilesetResolver, NormalizedLandmark } from '@mediapipe/tasks-vision';", ''
+));
+
+test('official lip topology creates closed outer and inner contours, preserving mouth opening', () => {
+  for (const [connections, expected] of [
+    [FaceLandmarker.FACE_LANDMARKS_LIPS, 2],
+    [FaceLandmarker.FACE_LANDMARKS_LEFT_EYE, 1],
+    [FaceLandmarker.FACE_LANDMARKS_RIGHT_EYE, 1],
+  ]) {
+    const loops = contourLoops(connections);
+    assert.equal(loops.length, expected);
+    assert.equal(loops.flat().length, new Set(connections.flatMap(({ start, end }) => [start, end])).size);
+    for (const loop of loops) {
+      loop.forEach((point, i) => {
+        const next = loop[(i + 1) % loop.length];
+        assert.ok(connections.some(({ start, end }) => start === point && end === next || end === point && start === next));
+      });
+    }
+  }
+});
 function fixture() {
   const calls = [];
   const uniforms = new Map();
@@ -152,5 +176,28 @@ test('preset SVGs have explicit raster dimensions for WebGL image upload', async
   for (const name of ['studio', 'office', 'nature']) {
     const svg = await readFile(new URL(`../public/backgrounds/${name}.svg`, import.meta.url), 'utf8');
     assert.match(svg, /<svg[^>]*width="1280"[^>]*height="720"/);
+  }
+});
+
+test('filter bypass is neutral and lost face disables eye and lip effects on the next frame', () => {
+  const { compositor, uniforms } = fixture();
+  const video = { videoWidth: 1280, videoHeight: 720 };
+  const mask = new Uint8Array(4).fill(255);
+  const regions = new Uint8Array(8);
+  const face = { eyes: [[0.3, 0.4, 0.05, 0.09], [0.6, 0.4, 0.05, 0.09]], mask: {} };
+  const filters = { ...DEFAULT_FILTERS, brightness: 60, whiteBalance: -80, skinSmoothing: 70, eyeSize: 100, redLips: 50, darkHair: 80 };
+  compositor.render(video, mask, 2, 2, true, false, 0, 0, filters, regions, face);
+  assert.deepEqual(uniforms.get('u_brightness'), [0.6]);
+  assert.deepEqual(uniforms.get('u_whiteBalance'), [-0.8]);
+  assert.deepEqual(uniforms.get('u_eye0'), face.eyes[0]);
+  assert.deepEqual(uniforms.get('u_eyeSize'), [1]);
+  compositor.render(video, mask, 2, 2, true, false, 0, 0, filters, regions, null);
+  assert.deepEqual(uniforms.get('u_eyeSize'), [0]);
+  assert.deepEqual(uniforms.get('u_redLips'), [0]);
+  assert.deepEqual(uniforms.get('u_eye0'), [0, 0, 0, 0]);
+  assert.deepEqual(uniforms.get('u_skinSmoothing'), [0.7]);
+  compositor.render(video, mask, 2, 2, true, false, 0, 0, { ...filters, enabled: false }, regions, face);
+  for (const key of Object.keys(DEFAULT_FILTERS).filter((key) => key !== 'enabled')) {
+    assert.deepEqual(uniforms.get(`u_${key}`), [0]);
   }
 });

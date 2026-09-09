@@ -1,15 +1,39 @@
 import { useEffect, useRef, useState } from 'react';
 import { CameraPreviewProps } from '../types/camera';
 import { PersonSegmenter } from '../ai/PersonSegmenter';
+import { FaceTracker } from '../ai/FaceTracker';
+import type { FaceFeatures } from '../types/filters';
 import { WebGLCompositor } from '../rendering/WebGLCompositor';
 import styles from './CameraPreview.module.css';
 
-export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMode, background, blur, tint, onProcessingState }: CameraPreviewProps) {
+export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMode, background, blur, tint, filters, onFaceTrackingState, onProcessingState }: CameraPreviewProps) {
   const compositorRef = useRef<WebGLCompositor | null>(null);
-  const settings = useRef({ background, blur, tint });
-  settings.current = { background, blur, tint };
+  const trackerRef = useRef<FaceTracker | null>(null);
+  const settings = useRef({ background, blur, tint, filters });
+  settings.current = { background, blur, tint, filters };
   const [generation, setGeneration] = useState(0);
   const [backgroundError, setBackgroundError] = useState<string>();
+  const faceNeeded = filters.enabled && (filters.eyeSize > 0 || filters.redLips > 0 || filters.skinSmoothing > 0);
+
+  useEffect(() => {
+    if (!isActive || !faceNeeded) { onFaceTrackingState('off'); return; }
+    let cancelled = false;
+    const tracker = new FaceTracker();
+    onFaceTrackingState('loading');
+    void tracker.initialize().then(() => {
+      if (cancelled) { tracker.dispose(); return; }
+      trackerRef.current = tracker;
+      onFaceTrackingState('no-face');
+    }).catch(() => {
+      tracker.dispose();
+      if (!cancelled) onFaceTrackingState('error');
+    });
+    return () => {
+      cancelled = true;
+      trackerRef.current = null;
+      tracker.dispose();
+    };
+  }, [isActive, faceNeeded, facingMode, onFaceTrackingState]);
 
   useEffect(() => {
     const compositor = compositorRef.current;
@@ -61,7 +85,19 @@ export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMod
               const mask = segmenter.segment(video, time);
               if (mask) {
                 const effect = settings.current;
-                compositor!.render(video, mask.data, mask.width, mask.height, facingMode === 'user', effect.background.kind === 'blur', effect.blur, effect.tint);
+                let face: FaceFeatures | null = null;
+                const tracker = trackerRef.current;
+                if (tracker) {
+                  try {
+                    face = tracker.detect(video, time);
+                    onFaceTrackingState(face ? 'tracking' : 'no-face');
+                  } catch {
+                    tracker.dispose();
+                    trackerRef.current = null;
+                    onFaceTrackingState('error');
+                  }
+                }
+                compositor!.render(video, mask.data, mask.width, mask.height, facingMode === 'user', effect.background.kind === 'blur', effect.blur, effect.tint, effect.filters, mask.regions, face);
                 if (!ready) { ready = true; onProcessingState?.('ready'); }
               }
             }
@@ -79,7 +115,7 @@ export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMod
       compositor?.dispose();
       compositorRef.current = null;
     };
-  }, [isActive, facingMode, onProcessingState, videoRef, canvasRef]);
+  }, [isActive, facingMode, onProcessingState, onFaceTrackingState, videoRef, canvasRef]);
 
   return <div className={`${styles.container} ${styles[layout]}`}>
     <video ref={videoRef} className={styles.sourceVideo} autoPlay playsInline muted />

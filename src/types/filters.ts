@@ -1,0 +1,25 @@
+export interface CameraFilters {
+  enabled: boolean;
+  brightness: number;
+  whiteBalance: number;
+  saturation: number;
+  contrast: number;
+  skinBrightening: number;
+  skinSmoothing: number;
+  eyeSize: number;
+  redLips: number;
+  darkHair: number;
+}
+
+export const DEFAULT_FILTERS: CameraFilters = {
+  enabled: true, brightness: 0, whiteBalance: 0, saturation: 0, contrast: 0,
+  skinBrightening: 0, skinSmoothing: 0, eyeSize: 0, redLips: 0, darkHair: 0,
+};
+
+export type FaceTrackingState = 'off' | 'loading' | 'tracking' | 'no-face' | 'error';
+
+export interface FaceFeatures {
+  // Camera-normalized centers and circular radii, corrected for source aspect.
+  eyes: [number, number, number, number][];
+  mask: HTMLCanvasElement;
+}

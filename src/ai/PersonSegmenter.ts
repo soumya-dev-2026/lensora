@@ -10,6 +10,7 @@ const PREVIOUS = 0.3;
 
 export interface PersonMask {
   data: Uint8Array;
+  regions: Uint8Array;
   width: number;
   height: number;
 }
@@ -41,11 +42,18 @@ export class PersonSegmenter {
       }
       const confidence = confidences[0];
       const current = new Float32Array(confidence.width * confidence.height);
+      const regions = new Uint8Array(current.length * 2);
       // Sum only person probabilities, preserving soft boundaries between body
       // parts. Background and "others" (accessories/objects) never contribute.
       for (const category of PERSON_CLASSES) {
         const values = confidences[category].getAsFloat32Array();
-        for (let i = 0; i < current.length; i++) current[i] += values[i];
+        for (let i = 0; i < current.length; i++) {
+          current[i] += values[i];
+          if (category === 1) regions[i * 2 + 1] = Math.round(values[i] * 255);
+          if (category === 2 || category === 3) {
+            regions[i * 2] = Math.min(255, regions[i * 2] + Math.round(values[i] * 255));
+          }
+        }
       }
       if (!this.previousMask || this.maskWidth !== confidence.width || this.maskHeight !== confidence.height) {
         // Copy callback-owned data and seed the first frame without fading in.
@@ -59,6 +67,7 @@ export class PersonSegmenter {
       }
       mask = {
         data: Uint8Array.from(this.previousMask, (value) => Math.round(value * 255)),
+        regions,
         width: confidence.width,
         height: confidence.height,
       };
