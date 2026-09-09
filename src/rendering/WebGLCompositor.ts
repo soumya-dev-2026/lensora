@@ -52,63 +52,65 @@ vec2 enlargeEye(vec2 uv, vec4 eye) {
   vec2 relative = (uv - eye.xy) / eye.zw;
   float radius = length(relative);
   float falloff = 1.0 - smoothstep(0.0, 1.0, radius);
-  return eye.xy + (uv - eye.xy) * (1.0 - u_eyeSize * 0.24 * falloff);
+  return eye.xy + (uv - eye.xy) * (1.0 - u_eyeSize * 0.07 * falloff);
 }
 
 vec3 beautify(vec2 uv) {
   vec3 color = texture(u_camera, uv).rgb;
   vec2 regions = texture(u_regions, uv).rg;
-  vec2 face = texture(u_faceMask, uv).rg;
-  float skin = smoothstep(0.35, 0.8, regions.r);
-  float hair = smoothstep(0.4, 0.85, regions.g);
-  float protectedDetail = clamp(face.r + face.g, 0.0, 1.0);
+  vec3 face = texture(u_faceMask, uv).rgb;
+  float skin = smoothstep(0.2, 0.85, regions.r);
+  float hair = smoothstep(0.2, 0.85, regions.g);
+  float protectedDetail = clamp(face.r + face.g + face.b, 0.0, 1.0);
   float skinAmount = skin * (1.0 - protectedDetail);
   if (u_skinSmoothing > 0.0 && skinAmount > 0.01) {
     // Bilateral filtering preserves strong edges instead of blurring the face.
     vec3 sum = vec3(0.0);
     float total = 0.0;
-    vec2 stepSize = u_cameraTexel * max(1.0, 2.0 / (u_cameraTexel.y * 720.0));
+    vec2 stepSize = u_cameraTexel * max(1.0, 1.3 / (u_cameraTexel.y * 720.0));
     for (int y = -2; y <= 2; y++) {
       for (int x = -2; x <= 2; x++) {
         vec2 offset = vec2(float(x), float(y));
         vec2 sampleUv = uv + offset * stepSize;
         vec3 sampleColor = texture(u_camera, sampleUv).rgb;
         vec3 delta = sampleColor - color;
-        float weight = exp(-dot(offset, offset) / 4.0 - dot(delta, delta) / 0.018);
+        float weight = exp(-dot(offset, offset) / 4.0 - dot(delta, delta) / 0.008);
         weight *= smoothstep(0.35, 0.8, texture(u_regions, sampleUv).r);
         sum += sampleColor * weight;
         total += weight;
       }
     }
-    color = mix(color, sum / max(total, 0.0001), u_skinSmoothing * skinAmount * 0.85);
+    // Retain skin texture and freckles: limit both correction and blend amount.
+    vec3 correction = clamp(sum / max(total, 0.0001) - color, vec3(-0.035), vec3(0.035));
+    color += correction * u_skinSmoothing * skinAmount * 0.5;
   }
-  color = mix(color, 1.0 - (1.0 - color) * 0.72, u_skinBrightening * skinAmount);
+  float skinLight = dot(color, vec3(0.2126, 0.7152, 0.0722));
+  float highlightProtection = 1.0 - smoothstep(0.55, 0.95, skinLight);
+  // A small exposure lift preserves skin hue instead of mixing in white.
+  color *= 1.0 + 0.14 * u_skinBrightening * skinAmount * highlightProtection;
   // Darken hair while retaining its original shading and strands.
-  color *= 1.0 - u_darkHair * hair * 0.72;
+  color *= 1.0 - u_darkHair * hair * 0.3;
   float lipLight = dot(color, vec3(0.299, 0.587, 0.114));
-  vec3 lipstick = vec3(0.72, 0.045, 0.10) * (0.4 + lipLight);
-  color = mix(color, lipstick, face.r * u_redLips * 0.8);
+  // Shift the existing lip color gently; preserve its luminance and highlights.
+  vec3 lipstick = color * vec3(1.16, 0.86, 0.93);
+  lipstick *= lipLight / max(dot(lipstick, vec3(0.299, 0.587, 0.114)), 0.001);
+  color = mix(color, lipstick, face.r * u_redLips * 0.55);
   return cameraColor(color);
 }
 
-float thresholdMask(vec2 uv) {
-  // The uploaded confidence already includes temporal smoothing.
-  return smoothstep(0.35, 0.65, texture(u_mask, uv).r);
-}
-
 float personMask(vec2 uv) {
-  // Small Gaussian edge blur in OUTPUT pixels, not low-resolution mask texels.
-  vec2 px = u_maskPixel;
-  float mask = thresholdMask(uv) * 0.25;
-  mask += thresholdMask(uv + vec2(px.x, 0.0)) * 0.125;
-  mask += thresholdMask(uv - vec2(px.x, 0.0)) * 0.125;
-  mask += thresholdMask(uv + vec2(0.0, px.y)) * 0.125;
-  mask += thresholdMask(uv - vec2(0.0, px.y)) * 0.125;
-  mask += thresholdMask(uv + px) * 0.0625;
-  mask += thresholdMask(uv - px) * 0.0625;
-  mask += thresholdMask(uv + vec2(px.x, -px.y)) * 0.0625;
-  mask += thresholdMask(uv + vec2(-px.x, px.y)) * 0.0625;
-  return mask;
+  // Filter confidence BEFORE thresholding so small changes cannot snap an edge.
+  vec2 px = u_maskPixel * 1.35;
+  float mask = texture(u_mask, uv).r * 0.25;
+  mask += texture(u_mask, uv + vec2(px.x, 0.0)).r * 0.125;
+  mask += texture(u_mask, uv - vec2(px.x, 0.0)).r * 0.125;
+  mask += texture(u_mask, uv + vec2(0.0, px.y)).r * 0.125;
+  mask += texture(u_mask, uv - vec2(0.0, px.y)).r * 0.125;
+  mask += texture(u_mask, uv + px).r * 0.0625;
+  mask += texture(u_mask, uv - px).r * 0.0625;
+  mask += texture(u_mask, uv + vec2(px.x, -px.y)).r * 0.0625;
+  mask += texture(u_mask, uv + vec2(-px.x, px.y)).r * 0.0625;
+  return smoothstep(0.12, 0.88, mask);
 }
 
 vec3 backgroundSample(vec2 uv) {
@@ -134,10 +136,6 @@ vec3 blurredBackground(vec2 uv) {
   return color / total;
 }
 
-float noise(vec2 point) {
-  return fract(sin(dot(point, vec2(12.9898, 78.233))) * 43758.5453);
-}
-
 void main() {
   vec2 cameraUv = (v_uv - 0.5) * u_cameraScale + 0.5;
   if (u_mirror) cameraUv.x = 1.0 - cameraUv.x;
@@ -145,22 +143,9 @@ void main() {
   vec3 foreground = beautify(beautyUv);
   vec2 backgroundUv = u_liveBackground ? cameraUv : (v_uv - 0.5) * u_backgroundScale + 0.5;
   vec3 background = blurredBackground(backgroundUv) * (1.0 - u_tint);
-  float alpha = personMask(beautyUv);
-
-  // Pull a little background light into only the soft boundary pixels.
-  float boundary = 1.0 - abs(alpha * 2.0 - 1.0);
-  boundary *= step(0.02, alpha) * step(alpha, 0.98);
-  vec3 lightWrappedForeground = mix(foreground, background, boundary * 0.10);
-
-  // Slightly reduce saturated color contamination at uncertain edges.
-  float luminance = dot(lightWrappedForeground, vec3(0.299, 0.587, 0.114));
-  vec3 cleanForeground = mix(lightWrappedForeground, vec3(luminance), boundary * 0.07);
-  vec3 composite = mix(background, cleanForeground, alpha);
-
-  // Keep a little camera grain without changing a fully tinted background.
-  float grain = (noise(gl_FragCoord.xy) - 0.5) * 0.012;
-  float skin = smoothstep(0.35, 0.8, texture(u_regions, beautyUv).r);
-  outColor = vec4(composite + grain * alpha * (1.0 - u_skinSmoothing * skin), 1.0);
+  // Eye enlargement must not move the person's silhouette or glasses coverage.
+  float alpha = max(personMask(cameraUv), texture(u_faceMask, cameraUv).b);
+  outColor = vec4(mix(background, foreground, alpha), 1.0);
 }`;
 
 function compile(gl: WebGL2RenderingContext, type: number, source: string) {

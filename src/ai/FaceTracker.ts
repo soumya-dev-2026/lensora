@@ -33,6 +33,7 @@ export class FaceTracker {
   private canvas = document.createElement('canvas');
   private context = this.canvas.getContext('2d');
   private lips = contourLoops(FaceLandmarker.FACE_LANDMARKS_LIPS);
+  private faceOval = contourLoops(FaceLandmarker.FACE_LANDMARKS_FACE_OVAL);
   private eyeLoops = [
     ...contourLoops(FaceLandmarker.FACE_LANDMARKS_LEFT_EYE),
     ...contourLoops(FaceLandmarker.FACE_LANDMARKS_RIGHT_EYE),
@@ -61,7 +62,7 @@ export class FaceTracker {
     const ctx = this.context;
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, width, height);
-    const path = (loops: number[][], color: string) => {
+    const trace = (loops: number[][]) => {
       ctx.beginPath();
       for (const loop of loops) {
         loop.forEach((index, i) => {
@@ -71,12 +72,29 @@ export class FaceTracker {
         });
         ctx.closePath();
       }
-      ctx.fillStyle = color;
-      ctx.fill('evenodd');
     };
-    path(this.lips, '#ff0000');
-    path(this.eyeLoops, '#00ff00');
-    return { mask: this.canvas, eyes: this.eyeLoops.map((loop) => this.eyeBounds(loop.map((i) => points[i]), video)) };
+    const eyes = this.eyeLoops.map((loop) => this.eyeBounds(loop.map((i) => points[i]), video));
+    // Blue protects the eye/glasses region from segmentation holes, including
+    // lenses incorrectly labeled background. Clip to the tracked face outline.
+    ctx.save();
+    trace(this.faceOval);
+    ctx.clip();
+    ctx.filter = 'blur(0.6px)';
+    ctx.fillStyle = '#0000ff';
+    for (const [x, y, rx, ry] of eyes) {
+      ctx.beginPath();
+      ctx.ellipse(x * width, y * height, rx * width * 1.15, ry * height * 0.7, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    // Add channels so eye detail does not erase glasses protection underneath.
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.filter = 'blur(0.5px)';
+    trace(this.lips); ctx.fillStyle = '#ff0000'; ctx.fill('evenodd');
+    trace(this.eyeLoops); ctx.fillStyle = '#00ff00'; ctx.fill('evenodd');
+    ctx.filter = 'none';
+    ctx.globalCompositeOperation = 'source-over';
+    return { mask: this.canvas, eyes };
   }
 
   private eyeBounds(points: NormalizedLandmark[], video: HTMLVideoElement): [number, number, number, number] {

@@ -31,11 +31,25 @@ The sparkle icon at the top left opens the centered **Camera filters** popup. Al
 - **Light & color:** brightness, white balance (cool to warm), saturation, and contrast (-100 to +100). These apply to the camera image, including the live room in Blur & tint mode. Replacement images and solid backgrounds retain their original colors.
 - **Enable filters** toggles a before/after comparison without losing slider settings. **Reset all filters** returns every control to neutral. All effects start at zero and apply to both preview and saved MP4.
 
-Eye and lip effects track one face at a time using [MediaPipe Face Landmarker](https://developers.google.com/edge/mediapipe/solutions/vision/face_landmarker/web_js). The extra model loads only when eye size, lipstick, or skin smoothing is enabled (tracking protects eye/lip detail while smoothing). Eye/lip effects disappear immediately when no face is found. If tracking cannot load, other controls remain usable; toggle filters off/on to retry. Low light, occlusion, rapid movement, and device speed affect tracking quality. Settings last for the current page session.
+Eye and lip effects track one face at a time using [MediaPipe Face Landmarker](https://developers.google.com/edge/mediapipe/solutions/vision/face_landmarker/web_js). Tracking starts with the camera, including when beauty filters are off, to protect the eye/glasses region from transparent holes. Protection is clipped to the face outline and clears immediately when tracking loses the face. If tracking cannot load, segmentation and other controls remain usable; restart the camera to retry. Low light, occlusion, rapid movement, and device speed affect tracking quality. Settings last for the current page session.
 
-The SelfieMulticlass model keeps hair, face skin, body skin, and clothes. Background and the model's "others" category (including accessories) are excluded. Classification can still make mistakes around objects touching a person; accessories such as glasses may also be removed. This model is more computationally demanding than the binary selfie model, so frame rate depends on the device.
+The SelfieMulticlass model keeps hair, face skin, body skin, and clothes. Accessory confidence is retained near face skin to preserve attached eyewear, while distant accessory objects remain excluded. The tracked eye region additionally preserves lenses misclassified as background and protects them from skin brightening and smoothing. Classification can still make mistakes around occlusions and objects touching the face. The models are computationally demanding, so frame rate depends on the device.
 
-The combined person confidence is blended once per video frame (70% current, 30% previous smoothed confidence) before uploading to WebGL. The shader applies a 0.35–0.65 soft threshold followed by a small Gaussian blur with one-output-pixel sample spacing. History resets when the camera restarts, switches, or the mask dimensions change.
+Frames use video-frame callbacks when available. Person, skin, and hair confidence use time-based adaptive smoothing: small fluctuations receive more smoothing; large changes follow the current frame promptly to limit motion trails. History resets after a capture gap, camera restart/switch, or dimension change. The shader blurs confidence at 1.35-output-pixel spacing before a wider 0.12–0.88 soft threshold. Beauty effects use conservative maximum strengths: a hue-preserving skin exposure lift, limited smoothing corrections, subtle eye enlargement, luminance-preserving lip tint, and hair darkening that retains shading. Artificial grain and edge desaturation are removed.
+
+## Cloudflare deployment
+
+The site is deployed with Cloudflare Workers static assets at:
+https://background-studio-soumya.video-background-replacement.workers.dev
+
+`wrangler.jsonc` publishes `dist` and serves the app for client-side routes. To update it:
+
+```sh
+npm run build
+npx wrangler@4 deploy
+```
+
+Run `npx wrangler@4 login` first if Cloudflare is not authenticated on the machine.
 
 ## Checks
 

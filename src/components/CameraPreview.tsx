@@ -13,10 +13,10 @@ export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMod
   settings.current = { background, blur, tint, filters };
   const [generation, setGeneration] = useState(0);
   const [backgroundError, setBackgroundError] = useState<string>();
-  const faceNeeded = filters.enabled && (filters.eyeSize > 0 || filters.redLips > 0 || filters.skinSmoothing > 0);
 
   useEffect(() => {
-    if (!isActive || !faceNeeded) { onFaceTrackingState('off'); return; }
+    // Track even with beauty disabled: glasses must remain opaque in raw mode.
+    if (!isActive) { onFaceTrackingState('off'); return; }
     let cancelled = false;
     const tracker = new FaceTracker();
     onFaceTrackingState('loading');
@@ -33,7 +33,7 @@ export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMod
       trackerRef.current = null;
       tracker.dispose();
     };
-  }, [isActive, faceNeeded, facingMode, onFaceTrackingState]);
+  }, [isActive, facingMode, onFaceTrackingState]);
 
   useEffect(() => {
     const compositor = compositorRef.current;
@@ -61,6 +61,8 @@ export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMod
     if (!isActive || !canvasRef.current) { onProcessingState?.('idle'); return; }
     let cancelled = false;
     let frame = 0;
+    let usesVideoCallback = false;
+    const sourceVideo = videoRef.current;
     let lastVideoTime = -1;
     let compositor: WebGLCompositor | undefined;
     const segmenter = new PersonSegmenter();
@@ -76,6 +78,13 @@ export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMod
         await segmenter.initialize();
         if (cancelled) { segmenter.dispose(); return; }
         let ready = false;
+        const scheduleFrame = () => {
+          if (cancelled) return;
+          usesVideoCallback = !!sourceVideo?.requestVideoFrameCallback;
+          frame = usesVideoCallback
+            ? sourceVideo!.requestVideoFrameCallback(processFrame)
+            : requestAnimationFrame(processFrame);
+        };
         const processFrame = (time: number) => {
           if (cancelled) return;
           try {
@@ -101,16 +110,17 @@ export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMod
                 if (!ready) { ready = true; onProcessingState?.('ready'); }
               }
             }
-            frame = requestAnimationFrame(processFrame);
+            scheduleFrame();
           } catch (error) { fail(error); }
         };
-        frame = requestAnimationFrame(processFrame);
+        scheduleFrame();
       } catch (error) { fail(error); }
     };
     void start();
     return () => {
       cancelled = true;
-      cancelAnimationFrame(frame);
+      if (usesVideoCallback) sourceVideo?.cancelVideoFrameCallback(frame);
+      else cancelAnimationFrame(frame);
       segmenter.dispose();
       compositor?.dispose();
       compositorRef.current = null;

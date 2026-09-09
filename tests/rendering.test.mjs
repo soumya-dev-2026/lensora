@@ -11,7 +11,7 @@ async function loadModule(path, replacement = (source) => source) {
 }
 
 // Model API fixture, independent of GPU/browser availability.
-const { PersonSegmenter } = await loadModule('../src/ai/PersonSegmenter.ts', (source) => source.replace(
+const { PersonSegmenter, temporalWeight } = await loadModule('../src/ai/PersonSegmenter.ts', (source) => source.replace(
   "import { FilesetResolver, ImageSegmenter } from '@mediapipe/tasks-vision';",
   `const FilesetResolver = { forVisionTasks: async () => ({}) };
    const ImageSegmenter = { createFromOptions: async (_, options) => {
@@ -50,8 +50,8 @@ test('keeps hair, body, face and clothes while rejecting background and other ob
   assert.deepEqual([...result.regions], [0, 0, 0, 255, 255, 0, 255, 0, 0, 0, 0, 0]);
   // Once the person leaves, smoothing must not retain a foreground silhouette.
   const emptyScene = channels.map((channel, category) => channel.map(() => Number(category === 0)));
-  const next = segmenter.segment({ channels: emptyScene, width: 6 }, 2);
-  assert.ok([...next.data].every((value) => value / 255 < 0.35));
+  const next = segmenter.segment({ channels: emptyScene, width: 6 }, 1 + 1000 / 30);
+  assert.ok([...next.data].every((value) => value / 255 < 0.12));
   segmenter.dispose();
 });
 
@@ -59,10 +59,11 @@ test('combines uncertain person classes without creating holes between skin and 
   const segmenter = new PersonSegmenter();
   await segmenter.initialize();
   const result = segmenter.segment({ width: 2, channels: [
-    [0.02, 0.10], [0.20, 0.02], [0.25, 0.02],
-    [0.25, 0.02], [0.25, 0.04], [0.03, 0.80],
+    [0.02, 0.90], [0.20, 0.02], [0.25, 0.02],
+    [0.25, 0.02], [0.25, 0.04], [0.03, 0],
   ] }, 1);
-  assert.deepEqual([...result.data], [242, 25]);
+  assert.ok(result.data[0] >= 242);
+  assert.equal(result.data[1], 25);
   segmenter.dispose();
 });
 
@@ -77,18 +78,54 @@ test('moving mask blends confidence once per frame without mutating earlier outp
   const segmenter = new PersonSegmenter();
   await segmenter.initialize();
   const first = segmenter.segment({ confidence: [0, 1], width: 2 }, 1);
-  const second = segmenter.segment({ confidence: [1, 0], width: 2 }, 2);
+  const second = segmenter.segment({ confidence: [1, 0], width: 2 }, 1 + 1000 / 30);
   assert.deepEqual([...first.data], [0, 255]);
-  assert.deepEqual([...second.data], [178, 77]);
-  const third = segmenter.segment({ confidence: [1, 0], width: 2 }, 3);
-  assert.deepEqual([...third.data], [232, 23]);
+  assert.ok(second.data[0] > 230 && second.data[1] < 25);
+  const third = segmenter.segment({ confidence: [1, 0], width: 2 }, 1 + 2000 / 30);
+  assert.ok(third.data[0] > second.data[0] && third.data[1] < second.data[1]);
   // Same pixel count but different dimensions must also reset history.
-  const resized = segmenter.segment({ confidence: [0, 1], width: 1, height: 2 }, 4);
+  const resized = segmenter.segment({ confidence: [0, 1], width: 1, height: 2 }, 101);
   assert.deepEqual([...resized.data], [0, 255]);
   segmenter.dispose();
   await segmenter.initialize();
   const restarted = segmenter.segment({ confidence: [1, 0], width: 1, height: 2 }, 5);
   assert.deepEqual([...restarted.data], [255, 0]);
+  segmenter.dispose();
+});
+
+test('preserves glasses classified as accessories near a face, but rejects distant objects', async () => {
+  const segmenter = new PersonSegmenter();
+  await segmenter.initialize();
+  const channels = Array.from({ length: 6 }, () => Array(9).fill(0));
+  channels[0].fill(1);
+  channels[0][2] = channels[0][3] = channels[0][8] = 0;
+  channels[3][2] = 1;
+  channels[5][3] = channels[5][8] = 1;
+  const result = segmenter.segment({ channels, width: 9 }, 1);
+  assert.equal(result.data[3], 255);
+  assert.equal(result.data[8], 0);
+  assert.equal(result.regions[3 * 2], 0); // Glasses must not be treated as skin.
+  segmenter.dispose();
+});
+
+test('small jitter is damped, fast motion follows promptly, and smoothing is time based', () => {
+  const slow = temporalWeight(0.03, 1000 / 30);
+  const fast = temporalWeight(0.8, 1000 / 30);
+  assert.ok(slow < 0.5 && fast > 0.9);
+  const half = temporalWeight(0.03, 1000 / 60);
+  assert.ok(Math.abs((1 - half) ** 2 - (1 - slow)) < 0.00001);
+});
+
+test('beauty-region masks damp jitter and old frames reset after a capture gap', async () => {
+  const segmenter = new PersonSegmenter();
+  await segmenter.initialize();
+  const first = segmenter.segment({ confidence: [0.5], width: 1 }, 1);
+  const next = segmenter.segment({ confidence: [0.54], width: 1 }, 1 + 1000 / 30);
+  assert.ok(next.regions[0] > first.regions[0]);
+  assert.ok(next.regions[0] < Math.round(0.54 * 255));
+  const resumed = segmenter.segment({ confidence: [0], width: 1 }, 1001);
+  assert.deepEqual([...resumed.data], [0]);
+  assert.deepEqual([...resumed.regions], [0, 0]);
   segmenter.dispose();
 });
 

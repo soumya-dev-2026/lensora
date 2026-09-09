@@ -47,7 +47,7 @@ export function CameraFilters({ value, onChange, faceState }: {
       </div>
       {tab === 'beauty' && ['loading', 'error', 'no-face'].includes(faceState) && <p className="muted" role="status">{
         faceState === 'loading' ? 'Preparing face effects…' :
-        faceState === 'error' ? 'Face effects unavailable. Toggle filters to retry.' :
+        faceState === 'error' ? 'Face tracking unavailable. Restart the camera to retry.' :
         'Face the camera for eye and lip effects.'
       }</p>}
       <div className="popup-footer">
