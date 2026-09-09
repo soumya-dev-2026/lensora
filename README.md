@@ -19,9 +19,13 @@ Open the local URL printed by Vite. Camera access requires localhost or HTTPS, c
 4. Adjust blur and black tint from 0–100%. **Adjust current background** applies these settings to the current background without changing its source. Only the background is affected.
 5. Choose **Portrait (9:16)** or **Landscape (16:9)** at the top right. The full canvas stays visible without stretching. The fullscreen button expands the studio, including its floating controls. Orientation is locked during recording.
 6. Record with the red bottom-center button. Smaller **Pause/Resume** and **Stop** buttons replace it. The top-left timer excludes paused time.
-7. Stop to open the video preview and filename dialog. **Save video** downloads WebM or MP4 according to browser support. Closing the dialog keeps the clip available under **Review & save video**. **New recording** clears the previous clip, so save it first.
+7. Stop to open the video preview and filename dialog. **Save MP4** downloads an MP4 recording. Browsers without MP4 recording support show an error before capture begins. Closing the dialog keeps the clip available under **Review & save video**. **New recording** clears the previous clip, so save it first.
 
 Recordings contain the composed canvas, without the floating controls, and are video-only (no microphone audio).
+
+The SelfieMulticlass model keeps hair, face skin, body skin, and clothes. Background and the model's "others" category (including accessories) are excluded. Classification can still make mistakes around objects touching a person; accessories such as glasses may also be removed. This model is more computationally demanding than the binary selfie model, so frame rate depends on the device.
+
+The combined person confidence is blended once per video frame (70% current, 30% previous smoothed confidence) before uploading to WebGL. The shader applies a 0.35–0.65 soft threshold followed by a small Gaussian blur with one-output-pixel sample spacing. History resets when the camera restarts, switches, or the mask dimensions change.
 
 ## Checks
 
@@ -30,11 +34,11 @@ npm test
 npm run build
 ```
 
-The regression tests cover confidence-to-alpha conversion, callback mask ownership, image texture setup, orientation cropping, blur/tint endpoints, and preset dimensions. They use a model fixture and a WebGL call recorder; they do not validate real model inference or GPU pixels.
+The regression tests cover confidence conversion and temporal smoothing, history resets, callback mask ownership, MP4 format selection, image texture setup, orientation cropping, output-pixel edge blur spacing, blur/tint endpoints, and preset dimensions. They use a model fixture and a WebGL call recorder; they do not validate real model inference, GPU pixels, or actual browser encoding.
 
 For a camera/browser check:
 
-- Verify the person remains visible over each preset and a solid color; check hair and moving edges.
+- Verify face, hair, body, and clothes remain visible over each preset and a solid color; check moving edges, held objects, nearby chairs, and a scene with no person.
 - Upload different images into all three slots, then switch between them.
 - Try blur and tint at 0, intermediate values, and 100 on the live room and an image.
 - Check both orientations and fullscreen on desktop and mobile.

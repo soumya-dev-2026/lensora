@@ -14,7 +14,7 @@ uniform sampler2D u_background;
 uniform bool u_mirror;
 uniform vec2 u_cameraScale;
 uniform vec2 u_backgroundScale;
-uniform vec2 u_maskTexel;
+uniform vec2 u_maskPixel;
 uniform vec2 u_backgroundTexel;
 uniform float u_blur;
 uniform float u_tint;
@@ -22,17 +22,23 @@ uniform bool u_liveBackground;
 in vec2 v_uv;
 out vec4 outColor;
 
+float thresholdMask(vec2 uv) {
+  // The uploaded confidence already includes temporal smoothing.
+  return smoothstep(0.35, 0.65, texture(u_mask, uv).r);
+}
+
 float personMask(vec2 uv) {
-  vec2 px = u_maskTexel * 1.4;
-  float mask = texture(u_mask, uv).r * 0.28;
-  mask += texture(u_mask, uv + vec2(px.x, 0.0)).r * 0.12;
-  mask += texture(u_mask, uv - vec2(px.x, 0.0)).r * 0.12;
-  mask += texture(u_mask, uv + vec2(0.0, px.y)).r * 0.12;
-  mask += texture(u_mask, uv - vec2(0.0, px.y)).r * 0.12;
-  mask += texture(u_mask, uv + px).r * 0.06;
-  mask += texture(u_mask, uv - px).r * 0.06;
-  mask += texture(u_mask, uv + vec2(px.x, -px.y)).r * 0.06;
-  mask += texture(u_mask, uv + vec2(-px.x, px.y)).r * 0.06;
+  // Small Gaussian edge blur in OUTPUT pixels, not low-resolution mask texels.
+  vec2 px = u_maskPixel;
+  float mask = thresholdMask(uv) * 0.25;
+  mask += thresholdMask(uv + vec2(px.x, 0.0)) * 0.125;
+  mask += thresholdMask(uv - vec2(px.x, 0.0)) * 0.125;
+  mask += thresholdMask(uv + vec2(0.0, px.y)) * 0.125;
+  mask += thresholdMask(uv - vec2(0.0, px.y)) * 0.125;
+  mask += thresholdMask(uv + px) * 0.0625;
+  mask += thresholdMask(uv - px) * 0.0625;
+  mask += thresholdMask(uv + vec2(px.x, -px.y)) * 0.0625;
+  mask += thresholdMask(uv + vec2(-px.x, px.y)) * 0.0625;
   return mask;
 }
 
@@ -69,8 +75,7 @@ void main() {
   vec4 foreground = texture(u_camera, cameraUv);
   vec2 backgroundUv = u_liveBackground ? cameraUv : (v_uv - 0.5) * u_backgroundScale + 0.5;
   vec3 background = blurredBackground(backgroundUv) * (1.0 - u_tint);
-  float rawMask = personMask(cameraUv);
-  float alpha = smoothstep(0.05, 0.95, rawMask);
+  float alpha = personMask(cameraUv);
 
   // Pull a little background light into only the soft boundary pixels.
   float boundary = 1.0 - abs(alpha * 2.0 - 1.0);
@@ -114,7 +119,7 @@ export class WebGLCompositor {
   private cameraScaleLocation: WebGLUniformLocation | null;
   private backgroundScaleLocation: WebGLUniformLocation | null;
   private mirrorLocation: WebGLUniformLocation | null;
-  private maskTexelLocation: WebGLUniformLocation | null;
+  private maskPixelLocation: WebGLUniformLocation | null;
   private backgroundTexelLocation: WebGLUniformLocation | null;
 
   constructor(private canvas: HTMLCanvasElement) {
@@ -147,7 +152,7 @@ export class WebGLCompositor {
     this.cameraScaleLocation = gl.getUniformLocation(program, 'u_cameraScale');
     this.backgroundScaleLocation = gl.getUniformLocation(program, 'u_backgroundScale');
     this.mirrorLocation = gl.getUniformLocation(program, 'u_mirror');
-    this.maskTexelLocation = gl.getUniformLocation(program, 'u_maskTexel');
+    this.maskPixelLocation = gl.getUniformLocation(program, 'u_maskPixel');
     this.backgroundTexelLocation = gl.getUniformLocation(program, 'u_backgroundTexel');
     this.blurLocation = gl.getUniformLocation(program, 'u_blur');
     this.tintLocation = gl.getUniformLocation(program, 'u_tint');
@@ -244,7 +249,9 @@ export class WebGLCompositor {
     gl.bindTexture(gl.TEXTURE_2D, this.maskTexture);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, maskWidth, maskHeight, 0, gl.RED, gl.UNSIGNED_BYTE, mask);
-    gl.uniform2f(this.maskTexelLocation, 1 / maskWidth, 1 / maskHeight);
+    gl.uniform2f(this.maskPixelLocation,
+      Math.min(1, outputAspect / cameraAspect) / this.canvas.width,
+      Math.min(1, cameraAspect / outputAspect) / this.canvas.height);
     gl.uniform1i(this.mirrorLocation, mirror ? 1 : 0);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }

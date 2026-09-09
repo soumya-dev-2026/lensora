@@ -4,6 +4,7 @@ import { CameraPreview } from './components/CameraPreview';
 import { BackgroundPicker, BACKGROUNDS } from './components/BackgroundPicker';
 import { Modal } from './components/Modal';
 import { BackgroundSelection, CanvasLayout } from './types/camera';
+import { getMp4MimeType } from './recording/mp4';
 import './App.css';
 
 type RecordingState = 'idle' | 'starting' | 'recording' | 'paused' | 'stopping';
@@ -76,15 +77,14 @@ function App() {
     try {
       const canvas = canvasRef.current;
       if (!canvas || !window.MediaRecorder || !canvas.captureStream) throw new Error('Video recording is unavailable in this browser.');
-      const mimeType = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4']
-        .find((type) => MediaRecorder.isTypeSupported(type));
+      const mimeType = getMp4MimeType((type) => MediaRecorder.isTypeSupported(type));
       stream = canvas.captureStream(30);
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const recorder = new MediaRecorder(stream, { mimeType });
       const chunks: Blob[] = [];
       recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
       recorder.onstop = () => {
         recorder.stream.getTracks().forEach((track) => track.stop());
-        const blob = new Blob(chunks, { type: recorder.mimeType || chunks[0]?.type || 'video/webm' });
+        const blob = new Blob(chunks, { type: recorder.mimeType || mimeType });
         if (blob.size) { setSavedClip(blob); setSaveOpen(true); }
         else setRecordingError('No video was captured. Please try again.');
         recorderRef.current = null;
@@ -155,11 +155,10 @@ function App() {
   };
   const save = () => {
     if (!savedClip || !clipUrl) return;
-    const extension = savedClip.type.includes('mp4') ? 'mp4' : 'webm';
     const safeName = fileName.trim().replace(/\.(webm|mp4)$/i, '').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-').slice(0, 120) || 'background-video';
     const link = document.createElement('a');
     link.href = clipUrl;
-    link.download = `${safeName}.${extension}`;
+    link.download = `${safeName}.mp4`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -210,9 +209,9 @@ function App() {
     </div>
     {saveOpen && savedClip && <Modal title="Your video is ready" onClose={() => setSaveOpen(false)}>
       {clipUrl && <video className="recorded-preview" src={clipUrl} controls playsInline />}
-      <p className="muted">{formatTime(elapsed)} · {(savedClip.size / 1024 / 1024).toFixed(1)} MB · Video only</p>
+      <p className="muted">{formatTime(elapsed)} · {(savedClip.size / 1024 / 1024).toFixed(1)} MB · MP4 · Video only</p>
       <label className="filename">File name<input autoFocus value={fileName} maxLength={120} onChange={(event) => setFileName(event.target.value)} placeholder="background-video" /></label>
-      <button className="primary" disabled={!clipUrl} onClick={save}>Save video</button>
+      <button className="primary" disabled={!clipUrl} onClick={save}>Save MP4</button>
     </Modal>}
   </div>;
 }

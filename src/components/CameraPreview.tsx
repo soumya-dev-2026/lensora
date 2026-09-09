@@ -38,7 +38,6 @@ export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMod
     let cancelled = false;
     let frame = 0;
     let lastVideoTime = -1;
-    let previousMask: Uint8Array | null = null;
     let compositor: WebGLCompositor | undefined;
     const segmenter = new PersonSegmenter();
     onProcessingState?.('loading');
@@ -61,10 +60,8 @@ export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMod
               lastVideoTime = video.currentTime;
               const mask = segmenter.segment(video, time);
               if (mask) {
-                if (!previousMask || previousMask.length !== mask.data.length) previousMask = mask.data;
-                else for (let i = 0; i < mask.data.length; i++) previousMask[i] = Math.round(mask.data[i] * 0.8 + previousMask[i] * 0.2);
                 const effect = settings.current;
-                compositor!.render(video, previousMask, mask.width, mask.height, facingMode === 'user', effect.background.kind === 'blur', effect.blur, effect.tint);
+                compositor!.render(video, mask.data, mask.width, mask.height, facingMode === 'user', effect.background.kind === 'blur', effect.blur, effect.tint);
                 if (!ready) { ready = true; onProcessingState?.('ready'); }
               }
             }
