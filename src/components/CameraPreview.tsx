@@ -5,9 +5,13 @@ import { SegmentationInput } from '../ai/SegmentationInput';
 import { FaceTracker } from '../ai/FaceTracker';
 import type { FaceFeatures } from '../types/filters';
 import { WebGLCompositor } from '../rendering/WebGLCompositor';
+import { drawLiveText } from '../rendering/liveText';
+import { LiveTextHandle } from './LiveTextHandle';
 import styles from './CameraPreview.module.css';
 
-export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, splitCamera = false, isActive, facingMode, background, blur, tint, filters, effects, comparing = false, onStartCamera, cameraStarting = false, cameraDisabled = false, onFaceTrackingState, onProcessingState }: CameraPreviewProps) {
+export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, splitCamera = false, liveText, onLiveTextChange, isActive, facingMode, background, blur, tint, filters, effects, comparing = false, onStartCamera, cameraStarting = false, cameraDisabled = false, onFaceTrackingState, onProcessingState }: CameraPreviewProps) {
+  const liveTextRef = useRef(liveText);
+  liveTextRef.current = liveText;
   const splitSettings = useRef({ splitCamera, layout });
   splitSettings.current = { splitCamera, layout };
   const originalRef = useRef<HTMLVideoElement>(null);
@@ -86,7 +90,12 @@ export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, 
     };
     const start = async () => {
       try {
-        compositor = new WebGLCompositor(canvasRef.current!);
+        const output = canvasRef.current!;
+        const context = output.getContext('2d', { alpha: false });
+        if (!context) throw new Error('Could not create the recording canvas.');
+        const scene = document.createElement('canvas');
+        scene.width = output.width; scene.height = output.height;
+        compositor = new WebGLCompositor(scene);
         compositorRef.current = compositor;
         setGeneration((value) => value + 1);
         await segmenter.initialize();
@@ -121,6 +130,8 @@ export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, 
                   }
                 }
                 const canvas = canvasRef.current!;
+                if (scene.width !== canvas.width) scene.width = canvas.width;
+                if (scene.height !== canvas.height) scene.height = canvas.height;
                 const second = secondaryVideoRef?.current;
                 const split = splitSettings.current.splitCamera && second && second.readyState >= 2;
                 const stacked = splitSettings.current.layout === 'portrait';
@@ -134,6 +145,8 @@ export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, 
                   compositor!.render(second, opaqueMask, 1, 1, mirror, true, 0, 0, undefined, undefined, null, undefined, time / 1000,
                     { x: stacked ? 0 : width, y: 0, width, height });
                 }
+                context.drawImage(scene, 0, 0);
+                drawLiveText(context, liveTextRef.current, canvas.width, canvas.height);
                 if (!ready) { ready = true; onProcessingState?.('ready'); }
               }
             }
@@ -159,6 +172,7 @@ export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, 
     <video ref={secondaryVideoRef} className={styles.sourceVideo} autoPlay playsInline muted />
     <canvas ref={canvasRef} className={styles.canvas} width={layout === 'portrait' ? 720 : 1280} height={layout === 'landscape' ? 720 : 1280} />
     {isActive && comparing && <><video ref={originalRef} className={styles.originalPreview} style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : undefined }} autoPlay playsInline muted /><span className={styles.originalLabel}>Original preview</span></>}
+    {isActive && !comparing && liveText && onLiveTextChange && <LiveTextHandle value={liveText} width={layout === 'portrait' ? 720 : 1280} height={layout === 'landscape' ? 720 : 1280} onChange={onLiveTextChange} />}
     {!isActive && <div className={styles.overlay}>
       <button type="button" data-camera-start className={styles.cameraOrb} aria-label="Start camera preview" disabled={cameraDisabled || cameraStarting} onClick={onStartCamera}><svg aria-hidden="true" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="m8 5 2-2h4l2 2h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" /><circle cx="12" cy="13" r="4" /></svg></button>
       <span className={styles.startLabel}>{cameraStarting ? 'Starting camera…' : 'Start camera'}</span>

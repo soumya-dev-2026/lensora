@@ -157,3 +157,5 @@
 .studio-settings-tabs button:not([aria-selected=true]):hover { color: #e4f8f2; }
 .studio-editor-launcher[aria-disabled=true] { opacity: .45; cursor: not-allowed; }
 .studio-editor-launcher:focus-visible { outline-offset: -3px; }
+.studio-creator { margin-top: 24px; padding: 18px 0 max(6px, env(safe-area-inset-bottom)); border-top: 1px solid #ffffff1f; text-align: center; color: #a5b6c0; font-size: 12px; }
+.studio-creator strong { color: #b3ecde; font-weight: 500; }

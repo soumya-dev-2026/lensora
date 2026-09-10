@@ -147,6 +147,7 @@ test('record preparation, countdown cancellation, skip, comparison, and saved-lo
   };
   const { default: App } = await load('../src/App.tsx', `
     const { DEFAULT_FILTERS, DEFAULT_EFFECTS, readPreference, writePreference, RecordingCountdown, CompareButton, useCamera, RecordingAudio } = globalThis.usabilityApp;
+    const DEFAULT_LIVE_TEXT = { enabled: false }; const LiveTextControls = () => null;
     const BACKGROUNDS = [{ src: '/backgrounds/studio.svg' }]; const Icon = () => null;
     const CameraPreview = () => null, BackgroundPicker = () => null, CameraFilters = () => null, CameraEffects = () => null, MicrophoneMeter = () => null, MotionToggle = () => null;
     const SavedLooks = () => null;

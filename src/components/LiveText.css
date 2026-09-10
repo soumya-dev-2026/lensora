@@ -1,0 +1,26 @@
+.live-text-controls { display: grid; gap: 18px; padding-top: 18px; }
+.live-text-field { display: grid; gap: 8px; font-size: 13px; }
+.live-text-field textarea { width: 100%; resize: vertical; min-height: 80px; color: #fff; padding: 12px; border: 1px solid #ffffff30; border-radius: 12px; background: #071824; }
+.live-text-hint { font-size: 12px; line-height: 1.6; color: #a5b6c0; }
+.live-text-sample { display: grid; place-items: center; min-height: 100px; padding: 20px; border-radius: 14px; background: repeating-conic-gradient(#112a39 0% 25%, #183442 0% 50%) 0 / 20px 20px; }
+.live-text-sample span { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; text-align: center; }
+.live-text-color { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; }
+.live-text-color input { width: 64px; height: 40px; border: 1px solid #ffffff30; border-radius: 8px; padding: 3px; background: transparent; }
+.live-text-fonts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.live-text-fonts button { display: grid; gap: 5px; place-items: center; padding: 12px 4px; }
+.live-text-fonts span { font-size: 28px; }
+.live-text-fonts small { font-size: 10px; }
+.live-text-fonts button[aria-pressed=true] { color: #b3ecde; border-color: #b3ecde; background: #b3ecde18; }
+.live-text-handle { position: absolute; z-index: 1; transform: translate(-50%, -50%); border: 1px dashed transparent; touch-action: none; cursor: grab; user-select: none; }
+.live-text-handle:hover, .live-text-handle:focus-visible { border-color: #b3ecde; outline-offset: 2px; }
+.live-text-handle:active { cursor: grabbing; }
+.live-text-handle span { position: absolute; bottom: 100%; left: 0; padding: 3px 7px; font: 11px Arial, sans-serif; white-space: nowrap; background: #071824; color: #b3ecde; border-radius: 5px; visibility: hidden; }
+.live-text-handle:hover span, .live-text-handle:focus-visible span { visibility: visible; }
+.studio .live-text-gauges .gauge-control { padding-inline: 3px; }
+.studio .live-text-gauges .gauge-step-buttons { gap: 2px; }
+.studio .live-text-gauges .gauge-caption label { font-size: 12px; }
+.studio .live-text-controls .live-text-gauges { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.live-text-alignment { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.live-text-alignment button { display: grid; place-items: center; min-height: 44px; }
+.live-text-alignment button[aria-pressed=true] { color: #b3ecde; border-color: #b3ecde; background: #b3ecde18; }

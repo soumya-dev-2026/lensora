@@ -17,6 +17,8 @@ import { CompareButton } from './components/CompareButton';
 import { SavedLooks } from './components/SavedLooks';
 import { MotionToggle } from './components/MotionToggle';
 import { readPreference, writePreference } from './storage/uiPreferences';
+import { LiveTextControls } from './components/LiveTextControls';
+import { DEFAULT_LIVE_TEXT, type LiveText } from './rendering/liveText';
 import './App.css';
 import './glass-theme.css';
 
@@ -24,6 +26,7 @@ const settingsTabs = [
   { key: 'background', label: 'Background', icon: 'image' },
   { key: 'filters', label: 'Filters', icon: 'sparkle' },
   { key: 'effects', label: 'Effects', icon: 'effects' },
+  { key: 'text', label: 'Text', icon: 'text' },
 ] as const;
 type SettingsTab = typeof settingsTabs[number]['key'];
 
@@ -53,6 +56,7 @@ function getDefaultLayout(): CanvasLayout {
 }
 
 function App() {
+  const [liveText, setLiveText] = useState<LiveText>({ ...DEFAULT_LIVE_TEXT });
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('background');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsExpanded, setSettingsExpanded] = useState(() => readPreference('expanded-settings', false));
@@ -326,7 +330,7 @@ function App() {
 
   return <div className="studio" data-camera-active={isActive} ref={studioRef}>
     <main className="stage" aria-label="Camera studio">
-      <CameraPreview layout={layout} videoRef={videoRef} canvasRef={canvasRef} secondaryVideoRef={secondaryVideoRef} splitCamera={splitCamera} isActive={isActive} facingMode={facingMode} background={background} blur={blur} tint={tint} filters={filters} effects={effects} comparing={comparing} onStartCamera={() => void startPreview()} cameraStarting={cameraStarting} cameraDisabled={!isSupported || busy} onFaceTrackingState={setFaceState} onProcessingState={handleProcessingState} />
+      <CameraPreview layout={layout} videoRef={videoRef} canvasRef={canvasRef} secondaryVideoRef={secondaryVideoRef} splitCamera={splitCamera} liveText={liveText} onLiveTextChange={setLiveText} isActive={isActive} facingMode={facingMode} background={background} blur={blur} tint={tint} filters={filters} effects={effects} comparing={comparing} onStartCamera={() => void startPreview()} cameraStarting={cameraStarting} cameraDisabled={!isSupported || busy} onFaceTrackingState={setFaceState} onProcessingState={handleProcessingState} />
     </main>
     {recordingState === 'countdown' && <RecordingCountdown onComplete={beginRecording} onCancel={cancelRecordingStart} />}
     {isActive && !splitCamera && processing === 'ready' && recordingState !== 'countdown' && recordingState !== 'starting' && <CompareButton onChange={setComparing} />}
@@ -337,6 +341,7 @@ function App() {
       <button className="icon-button glass" data-current={settingsTab === 'background'} aria-label="Background filters" title="Background" aria-haspopup="dialog" onClick={() => openSettings('background')}><Icon name="image" /></button>
       <button className="icon-button glass" data-current={settingsTab === 'filters'} aria-label="Camera filters" title="Camera filters" aria-haspopup="dialog" onClick={() => openSettings('filters')}><Icon name="sparkle" /></button>
       <button className="icon-button glass" data-current={settingsTab === 'effects'} aria-label="Camera effects" title="Camera effects" aria-haspopup="dialog" onClick={() => openSettings('effects')}><Icon name="sliders" /></button>
+      <button className="icon-button glass live-text-launcher" data-current={settingsTab === 'text'} aria-label="Live text" title="Live text" aria-haspopup="dialog" onClick={() => { setComparing(false); openSettings('text'); }}><Icon name="text" /></button>
     </div>
     <div className="top-right">
       <button className="icon-button glass" aria-label="Canvas orientation" title="Canvas orientation" aria-haspopup="dialog" disabled={busy} onClick={() => setLayoutOpen(true)}><Icon name={layout} /></button>
@@ -424,6 +429,9 @@ function App() {
       <div id="studio-panel-effects" className="studio-tab-content" role="tabpanel" aria-labelledby="studio-tab-effects" hidden={settingsTab !== 'effects'}>
         <CameraEffects value={effects} onChange={setEffects} faceState={faceState} />
       </div>
+      <div id="studio-panel-text" className="studio-tab-content" role="tabpanel" aria-labelledby="studio-tab-text" hidden={settingsTab !== 'text'}>
+        <LiveTextControls value={liveText} onChange={setLiveText} canPosition={isActive} onPosition={() => { setComparing(false); setSettingsOpen(false); }} />
+      </div>
       <SavedLooks settings={{ background, blur, tint, filters, effects, layout }} busy={busy} onApply={(look) => {
         if (busy) return;
         setBackground({ ...look.background }); setBlur(look.blur); setTint(look.tint);
@@ -453,6 +461,7 @@ function App() {
         <MotionToggle />
         </div>
       </details>
+      <footer className="studio-creator">Creator: <strong>Soumya Pal</strong></footer>
     </Modal>
     {layoutOpen && <Modal variant="dialog" title="Canvas orientation" onClose={() => setLayoutOpen(false)}>
       <div className="orientation-options" role="group" aria-label="Canvas orientation">

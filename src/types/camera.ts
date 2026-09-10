@@ -1,6 +1,7 @@
 /**
  * Camera-related type definitions
  */
+import type { LiveText } from '../rendering/liveText';
 import type { CameraEffects } from './effects';
 import { CameraFilters, FaceTrackingState } from './filters';
 
@@ -56,6 +57,8 @@ export interface CameraPreviewProps {
   canvasRef: React.RefObject<HTMLCanvasElement>;
   secondaryVideoRef?: React.RefObject<HTMLVideoElement>;
   splitCamera?: boolean;
+  liveText?: LiveText;
+  onLiveTextChange?: (value: LiveText) => void;
   isActive: boolean;
   facingMode: 'user' | 'environment';
   background: BackgroundSelection;

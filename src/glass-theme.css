@@ -460,3 +460,7 @@ html[data-motion=off] .studio-editor-launcher:active { transform: none !importan
 @media (max-width: 600px) {
   .studio > .studio-split-launcher { right: max(12px, env(safe-area-inset-right)); }
 }
+
+@media (max-width: 380px) {
+  .studio > :is(.top-left, .top-right) { gap: 2px; padding: 4px; }
+}

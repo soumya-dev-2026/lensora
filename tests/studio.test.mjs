@@ -107,7 +107,8 @@ test('closing save preserves the clip on cancel; delete clears it and restarts t
       const readPreference = (key, fallback = true) => key === 'countdown' ? false : fallback;
       const writePreference = () => {};
       const MicrophoneMeter = () => null, CompareButton = () => null, SavedLooks = () => null, MotionToggle = () => null, RecordingCountdown = () => null;
-      const BACKGROUNDS = [{ src: 'studio.svg' }];
+      const DEFAULT_LIVE_TEXT = { enabled: false }; const LiveTextControls = () => null;
+    const BACKGROUNDS = [{ src: 'studio.svg' }];
       const DEFAULT_FILTERS = {};
       const DEFAULT_EFFECTS = {};
       const CameraPreview = () => null, BackgroundPicker = () => null, CameraFilters = () => null, CameraEffects = () => null;
@@ -141,6 +142,13 @@ test('closing save preserves the clip on cancel; delete clears it and restarts t
   await act(async () => button('Start recording').props.onClick());
   assert.equal(renderer.root.findAllByProps({ 'aria-label': 'Open video editor' }).length, 0);
   assert.equal(renderer.root.findAllByProps({ 'aria-label': 'Split camera' }).length, 0);
+  await act(async () => button('Live text').props.onClick());
+  assert.equal(renderer.root.findByProps({ id: 'studio-panel-text' }).props.hidden, false);
+  const textControls = renderer.root.find((node) => typeof node.props.onPosition === 'function');
+  await act(async () => textControls.props.onChange({ ...textControls.props.value, enabled: true, text: 'Live recording caption', color: '#ff0088', opacity: 60 }));
+  assert.equal(preview.props.liveText.text, 'Live recording caption');
+  assert.equal(preview.props.liveText.opacity, 60);
+  await act(async () => textControls.props.onPosition());
   await act(async () => button('Pause recording').props.onClick());
   assert.equal(renderer.root.findAllByProps({ 'aria-label': 'Open video editor' }).length, 0);
   assert.equal(renderer.root.findAllByProps({ 'aria-label': 'Split camera' }).length, 0);

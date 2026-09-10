@@ -29,6 +29,12 @@ Start the camera, open any studio settings popup, and enable **Studio preference
 
 Two simultaneous cameras require device and browser support. If the second camera cannot open, the app shows a message. If opening it interrupts the main camera, start the camera again to return to single-camera mode. Stopping the camera or leaving the studio releases both streams.
 
+## Live text
+
+Use the **Live text** icon (T) in the top-left controls, or the **Text** settings tab. Enter a caption, choose a color and one of six font previews, and adjust font size and opacity with the gauges. Use **Position on video** to close settings, then drag the text on the camera preview; arrow keys move focused text, and Shift moves it in larger steps. Text stays inside the canvas, wraps when needed, and works across portrait, landscape, square, and split-camera views.
+
+Text changes are included directly in the recording while it is running. Drag outlines and controls are excluded. **Show text on video** hides the caption without deleting it; **Remove text** clears it. Text settings remain available while recording and paused. Fonts use locally available system families; their appearance can vary by device.
+
 ## Camera filters
 
 The sparkle icon at the top left opens the centered **Camera filters** popup. All popups use translucent surfaces and blurred backdrops, and close with the close icon, Escape, or a click outside. They work during recording.
