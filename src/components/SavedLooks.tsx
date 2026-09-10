@@ -33,7 +33,7 @@ export function SavedLooks({ settings, onApply, busy }: { settings: StudioLookSe
     catch { setError('Could not delete the saved look. Please try again.'); }
     finally { setPending(false); }
   };
-  return <details className="studio-utility-panel saved-looks-panel" open>
+  return <details className="studio-utility-panel saved-looks-panel">
     <summary><span className="utility-heading-icon"><Icon name="bookmark" size={23} /></span><span className="utility-heading-copy"><strong>Saved looks</strong><small>Save your background, filters, effects, and orientation together on this device.</small></span></summary>
     <div className="utility-panel-body">
     <label className="utility-field">Look name<span className="look-name-input"><Icon name="edit" size={19} /><input value={name} maxLength={60} placeholder="e.g. Warm interview" onChange={(event) => setName(event.target.value)} /></span></label>

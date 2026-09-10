@@ -1,3 +1,5 @@
+import { LiveImageControls } from './components/LiveImageControls';
+import type { LiveImage } from './rendering/liveImages';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useCamera } from './hooks/useCamera';
 import { CameraPreview } from './components/CameraPreview';
@@ -27,6 +29,7 @@ const settingsTabs = [
   { key: 'filters', label: 'Filters', icon: 'sparkle' },
   { key: 'effects', label: 'Effects', icon: 'effects' },
   { key: 'text', label: 'Text', icon: 'text' },
+  { key: 'images', label: 'Images', icon: 'image' },
 ] as const;
 type SettingsTab = typeof settingsTabs[number]['key'];
 
@@ -56,10 +59,10 @@ function getDefaultLayout(): CanvasLayout {
 }
 
 function App() {
+  const [liveImages, setLiveImages] = useState<LiveImage[]>([]);
   const [liveText, setLiveText] = useState<LiveText>({ ...DEFAULT_LIVE_TEXT });
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('background');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsExpanded, setSettingsExpanded] = useState(() => readPreference('expanded-settings', false));
   const [noiseCancellation, setNoiseCancellation] = useState(() => readPreference('noise-cancellation'));
   const [noisePending, setNoisePending] = useState(false);
   const [noiseNotice, setNoiseNotice] = useState('');
@@ -330,7 +333,7 @@ function App() {
 
   return <div className="studio" data-camera-active={isActive} ref={studioRef}>
     <main className="stage" aria-label="Camera studio">
-      <CameraPreview layout={layout} videoRef={videoRef} canvasRef={canvasRef} secondaryVideoRef={secondaryVideoRef} splitCamera={splitCamera} liveText={liveText} onLiveTextChange={setLiveText} isActive={isActive} facingMode={facingMode} background={background} blur={blur} tint={tint} filters={filters} effects={effects} comparing={comparing} onStartCamera={() => void startPreview()} cameraStarting={cameraStarting} cameraDisabled={!isSupported || busy} onFaceTrackingState={setFaceState} onProcessingState={handleProcessingState} />
+      <CameraPreview layout={layout} videoRef={videoRef} canvasRef={canvasRef} secondaryVideoRef={secondaryVideoRef} splitCamera={splitCamera} liveImages={liveImages} onLiveImagesChange={setLiveImages} liveText={liveText} onLiveTextChange={setLiveText} isActive={isActive} facingMode={facingMode} background={background} blur={blur} tint={tint} filters={filters} effects={effects} comparing={comparing} onStartCamera={() => void startPreview()} cameraStarting={cameraStarting} cameraDisabled={!isSupported || busy} onFaceTrackingState={setFaceState} onProcessingState={handleProcessingState} />
     </main>
     {recordingState === 'countdown' && <RecordingCountdown onComplete={beginRecording} onCancel={cancelRecordingStart} />}
     {isActive && !splitCamera && processing === 'ready' && recordingState !== 'countdown' && recordingState !== 'starting' && <CompareButton onChange={setComparing} />}
@@ -340,8 +343,6 @@ function App() {
     <div className="top-left">
       <button className="icon-button glass" data-current={settingsTab === 'background'} aria-label="Background filters" title="Background" aria-haspopup="dialog" onClick={() => openSettings('background')}><Icon name="image" /></button>
       <button className="icon-button glass" data-current={settingsTab === 'filters'} aria-label="Camera filters" title="Camera filters" aria-haspopup="dialog" onClick={() => openSettings('filters')}><Icon name="sparkle" /></button>
-      <button className="icon-button glass" data-current={settingsTab === 'effects'} aria-label="Camera effects" title="Camera effects" aria-haspopup="dialog" onClick={() => openSettings('effects')}><Icon name="sliders" /></button>
-      <button className="icon-button glass live-text-launcher" data-current={settingsTab === 'text'} aria-label="Live text" title="Live text" aria-haspopup="dialog" onClick={() => { setComparing(false); openSettings('text'); }}><Icon name="text" /></button>
     </div>
     <div className="top-right">
       <button className="icon-button glass" aria-label="Canvas orientation" title="Canvas orientation" aria-haspopup="dialog" disabled={busy} onClick={() => setLayoutOpen(true)}><Icon name={layout} /></button>
@@ -372,7 +373,7 @@ function App() {
       <MicrophoneMeter audio={audioRef.current} active={isActive} muted={micMuted} pending={micPending} />
       {(recordingState === 'starting' || recordingState === 'stopping') && <span className="record-caption" role="status">{recordingState === 'starting' ? 'Getting ready…' : 'Finishing…'}</span>}
     </div>
-    <Modal title="Studio settings" subtitle="Customize your studio environment" icon="sliders" open={settingsOpen} expanded={settingsExpanded} onToggleExpanded={() => { setSettingsExpanded(!settingsExpanded); writePreference('expanded-settings', !settingsExpanded); }} onClose={() => setSettingsOpen(false)}>
+    <Modal title="Studio settings" subtitle="Customize your studio environment" icon="sliders" open={settingsOpen} onClose={() => setSettingsOpen(false)}>
       <header className="studio-settings-slider">
       <div ref={settingsTabsRef} className="studio-settings-tabs" onPointerDown={(event) => {
         // Touch uses native momentum scrolling and snapping.
@@ -432,12 +433,15 @@ function App() {
       <div id="studio-panel-text" className="studio-tab-content" role="tabpanel" aria-labelledby="studio-tab-text" hidden={settingsTab !== 'text'}>
         <LiveTextControls value={liveText} onChange={setLiveText} canPosition={isActive} onPosition={() => { setComparing(false); setSettingsOpen(false); }} />
       </div>
+      <div id="studio-panel-images" className="studio-tab-content" role="tabpanel" aria-labelledby="studio-tab-images" hidden={settingsTab !== 'images'}>
+        <LiveImageControls value={liveImages} onChange={setLiveImages} canPosition={isActive} onPosition={() => { setComparing(false); setSettingsOpen(false); }} />
+      </div>
       <SavedLooks settings={{ background, blur, tint, filters, effects, layout }} busy={busy} onApply={(look) => {
         if (busy) return;
         setBackground({ ...look.background }); setBlur(look.blur); setTint(look.tint);
         setFilters({ ...look.filters }); setEffects({ ...look.effects }); setLayout(look.layout);
       }} />
-      <details className="studio-utility-panel studio-preferences-panel" open><summary><span className="utility-heading-icon"><Icon name="settings" size={23} /></span><span className="utility-heading-copy"><strong>Studio preferences</strong><small>Customize your recording and interface settings.</small></span></summary>
+      <details className="studio-utility-panel studio-preferences-panel"><summary><span className="utility-heading-icon"><Icon name="settings" size={23} /></span><span className="utility-heading-copy"><strong>Studio preferences</strong><small>Customize your recording and interface settings.</small></span></summary>
         <div className="preference-card-list">
         <label className="preference-toggle preference-card"><span className="preference-icon"><Icon name="timer" size={23} /></span><span className="preference-copy"><strong>3-second countdown</strong><small>You can skip or cancel before recording starts.</small></span><input type="checkbox" role="switch" checked={countdownEnabled} onChange={(event) => { setCountdownEnabled(event.target.checked); writePreference('countdown', event.target.checked); }} /></label>
         <label className="preference-toggle preference-card">

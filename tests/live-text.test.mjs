@@ -69,3 +69,25 @@ test('multiline alignment uses the text block edges without changing its positio
     assert.equal(box.x, 640);
   }
 });
+
+test('emoji picker replaces selected caption text, restores cursor and respects length limit', async () => {
+  const { default: React } = await import('react');
+  const { default: Renderer, act } = await import('react-test-renderer');
+  globalThis.React = React;
+  const source = (await readFile(new URL('../src/components/LiveTextControls.tsx', import.meta.url), 'utf8')).replace(/^import .*;$/gm, '');
+  const { outputText } = ts.transpileModule('const React = globalThis.React; const { useLayoutEffect, useRef, useState } = React; const Icon = () => null; const EmojiPicker = () => null; const ColorPicker = () => null; const GaugeSlider = () => null; const TEXT_FONTS = []; const textFont = () => ({});\n' + source, { compilerOptions: { module: ts.ModuleKind.ES2020, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React } });
+  const { LiveTextControls } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`);
+  let value = { ...DEFAULT_LIVE_TEXT, text: 'Hello world', enabled: false }, renderer;
+  const area = { selectionStart: 6, selectionEnd: 11, focus() {}, setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end; } };
+  const props = () => ({ value, canPosition: true, onPosition() {}, onChange(next) { value = next; renderer.update(React.createElement(LiveTextControls, props())); } });
+  await act(async () => { renderer = Renderer.create(React.createElement(LiveTextControls, props()), { createNodeMock: (node) => node.type === 'textarea' ? area : null }); });
+  await act(async () => renderer.root.findByProps({ label: 'Insert emoji' }).props.onSelect('🚀', 'Rocket'));
+  assert.equal(value.text, 'Hello 🚀'); assert.equal(value.enabled, true); assert.equal(area.selectionStart, 8);
+  await act(async () => renderer.root.findByProps({ label: 'Insert emoji' }).props.onSelect('❤️', 'Heart'));
+  assert.equal(value.text, 'Hello 🚀❤️');
+  await act(async () => { value = { ...value, text: 'a'.repeat(239) }; area.selectionStart = area.selectionEnd = 239; renderer.update(React.createElement(LiveTextControls, props())); });
+  await act(async () => renderer.root.findByProps({ label: 'Insert emoji' }).props.onSelect('🚀', 'Rocket'));
+  assert.equal(value.text.length, 239);
+  assert.ok(renderer.root.findByProps({ role: 'status' }));
+  await act(async () => renderer.unmount());
+});

@@ -24,3 +24,6 @@
 .live-text-alignment { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .live-text-alignment button { display: grid; place-items: center; min-height: 44px; }
 .live-text-alignment button[aria-pressed=true] { color: #b3ecde; border-color: #b3ecde; background: #b3ecde18; }
+
+.live-text-emojis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: -8px; }
+.studio .live-text-emojis button { min-width: 0; min-height: 44px; padding: 5px; font-size: 23px; border-radius: 9px; line-height: 1; }

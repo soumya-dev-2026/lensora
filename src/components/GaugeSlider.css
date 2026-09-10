@@ -32,7 +32,7 @@
 .gauge-control[data-disabled] { opacity: .45; }
 .gauge-control[data-disabled] .gauge-dial, fieldset:disabled .gauge-dial { cursor: not-allowed; }
 @media (max-width: 480px) { .gauge-control { padding: 10px; gap: 8px; flex-wrap: wrap; justify-content: center; } .gauge-caption { flex: 1 1 100px; } .gauge-dial { width: 170px; height: 170px; flex-basis: 170px; } }
-.effect-gauge-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.effect-gauge-pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .effect-gauge-pair .gauge-control { display: grid; justify-items: center; justify-content: stretch; gap: 10px; padding: 12px 8px; text-align: center; }
 .effect-gauge-pair .gauge-caption { display: contents; }
 .effect-gauge-pair .gauge-caption label { grid-row: 1; flex-direction: column; gap: 5px; }

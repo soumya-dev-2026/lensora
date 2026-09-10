@@ -1,3 +1,4 @@
+import { ColorPicker } from './ColorPicker';
 import { SwipeSlider } from './SwipeSlider';
 import { useId, useState } from 'react';
 import { CameraEffects as EffectSettings, DEFAULT_EFFECTS } from '../types/effects';
@@ -63,7 +64,7 @@ export function CameraEffects({ value, onChange, faceState }: {
             ]} />
             {slider('outline', 'Person outline', 'sparkle')}
             {value.outline > 0 && <div className="outline-controls">
-              <label className="outline-color">Outline color<input type="color" value={value.outlineColor} onChange={(event) => set('outlineColor', event.target.value)} /></label>
+              <ColorPicker label="Outline color" value={value.outlineColor} onChange={(color) => set('outlineColor', color)} />
               <GaugeSlider id="outline-width" label="Outline width" icon="frame" min={1} max={12} suffix="px" value={value.outlineWidth} disabled={!value.enabled} onChange={(next) => set('outlineWidth', next)} />
             </div>}
             {slider('spotlight', 'Spotlight', 'spotlight')}

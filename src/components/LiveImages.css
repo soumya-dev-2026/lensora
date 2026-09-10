@@ -1,0 +1,29 @@
+.live-image-controls { display: grid; gap: 12px; }
+.live-image-controls > .primary { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.live-image-list { display: grid; gap: 6px; max-height: 160px; overflow-y: auto; }
+.live-image-list button { display: flex; align-items: center; gap: 8px; text-align: left; min-width: 0; padding: 6px 8px; }
+.live-image-list img { width: 36px; height: 36px; object-fit: contain; border-radius: 5px; background: #ffffff12; }
+.live-image-list span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
+.live-image-slider { display: grid; gap: 4px; font-size: 12px; }
+.live-image-slider > span { display: flex; justify-content: space-between; }
+.live-image-slider output { color: #b6fff0; font-variant-numeric: tabular-nums; }
+.live-image-slider input { appearance: none; -webkit-appearance: none; width: 100%; height: 28px; background: transparent; cursor: pointer; }
+.live-image-slider input::-webkit-slider-runnable-track { height: 8px; border: 1px solid #8cd9e33d; border-radius: 999px; background: linear-gradient(#ffffff30, #00000030), linear-gradient(90deg, #65e9d5 var(--fill), #102b3b var(--fill)); box-shadow: inset 0 1px 3px #0008; }
+.live-image-slider input::-moz-range-track { height: 6px; border: 1px solid #8cd9e33d; border-radius: 999px; background: linear-gradient(#ffffff30, #00000030), linear-gradient(90deg, #65e9d5 var(--fill), #102b3b var(--fill)); }
+.live-image-slider input::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; margin-top: -7px; width: 20px; height: 20px; border: 1px solid #bffff4; border-radius: 50%; background: radial-gradient(ellipse at 35% 20%, #fff, #83f2df 45%, #136b71); box-shadow: 0 2px 5px #0008, 0 0 8px #65fce333; }
+.live-image-slider input::-moz-range-thumb { width: 18px; height: 18px; border: 1px solid #bffff4; border-radius: 50%; background: radial-gradient(ellipse at 35% 20%, #fff, #83f2df 45%, #136b71); box-shadow: 0 2px 5px #0008; }
+.live-image-actions { display: flex; gap: 8px; }
+.live-image-actions button { flex: 1; font-size: 12px; }
+
+.live-image-emoji-section { display: grid; gap: 7px; }
+.live-image-emoji-title { font-size: 12px; color: #b8d9e8; }
+.live-image-emojis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+.studio .live-image-emojis button { min-width: 0; min-height: 44px; padding: 4px 0; border-radius: 9px; font-size: 23px; line-height: 1; }
+@container (max-width: 250px) { .live-image-emojis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+.sticker-library { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; max-height: 200px; overflow-y: auto; }
+.sticker-preset { position: relative; min-width: 0; }
+.sticker-preset > button:first-child { width: 100%; height: 86px; display: grid; place-items: center; gap: 4px; padding: 8px 4px; }
+.sticker-preset img { width: 100%; height: 44px; object-fit: contain; }
+.sticker-preset span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.studio .sticker-preset .sticker-delete { position: absolute; top: 0; right: 0; width: 24px; height: 24px; min-width: 24px; min-height: 24px; display: grid; place-items: center; padding: 0; border-radius: 50%; background: #071824; }

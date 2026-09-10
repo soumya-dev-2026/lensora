@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { readFile } from 'node:fs/promises';
+import ts from 'typescript';
+test('emoji popup has a broad catalog, filters by search/category and closes on selection', async () => {
+  const { default: React } = await import('react');
+  const { default: Renderer, act } = await import('react-test-renderer');
+  globalThis.React = React;
+  const source = (await readFile(new URL('../src/components/EmojiPicker.tsx', import.meta.url), 'utf8')).replace(/^import .*;$/gm, '');
+  const { outputText } = ts.transpileModule('const React = globalThis.React; const { useState } = React; const Icon = () => null; const Modal = ({ children }) => React.createElement("section", { role: "dialog" }, children);\n' + source, { compilerOptions: { module: ts.ModuleKind.ES2020, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React } });
+  const { EmojiPicker, EMOJI_GROUPS } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`);
+  assert.equal(EMOJI_GROUPS.flatMap((group) => group.items).length, 116);
+  let renderer; const selected = [];
+  await act(async () => { renderer = Renderer.create(React.createElement(EmojiPicker, { onSelect: (...args) => selected.push(args) })); });
+  assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 0);
+  await act(async () => renderer.root.findByProps({ 'aria-haspopup': 'dialog' }).props.onClick());
+  const search = () => renderer.root.findByProps({ 'aria-label': 'Search emojis' });
+  await act(async () => search().props.onChange({ target: { value: 'rocket' } }));
+  assert.equal(renderer.root.findAllByProps({ className: 'emoji-popup-grid' })[0].findAllByType('button').length, 1);
+  await act(async () => renderer.root.findByProps({ 'aria-label': 'Choose Rocket emoji' }).props.onClick());
+  assert.deepEqual(selected, [['🚀', 'Rocket']]); assert.equal(renderer.root.findAllByProps({ role: 'dialog' }).length, 0);
+  await act(async () => renderer.root.findByProps({ 'aria-haspopup': 'dialog' }).props.onClick());
+  await act(async () => renderer.root.findAllByType('button').find((button) => button.children.includes('Food')).props.onClick());
+  assert.equal(renderer.root.findAllByProps({ className: 'emoji-popup-grid' })[0].findAllByType('button').length, 12);
+  await act(async () => search().props.onChange({ target: { value: 'no-match' } }));
+  assert.ok(renderer.root.findByProps({ role: 'status' }));
+  await act(async () => renderer.unmount());
+});

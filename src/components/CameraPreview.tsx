@@ -1,3 +1,5 @@
+import { drawLiveImages } from '../rendering/liveImages';
+import { LiveImageHandle } from './LiveImageHandle';
 import { useEffect, useRef, useState } from 'react';
 import { CameraPreviewProps } from '../types/camera';
 import { PersonSegmenter } from '../ai/PersonSegmenter';
@@ -9,7 +11,9 @@ import { drawLiveText } from '../rendering/liveText';
 import { LiveTextHandle } from './LiveTextHandle';
 import styles from './CameraPreview.module.css';
 
-export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, splitCamera = false, liveText, onLiveTextChange, isActive, facingMode, background, blur, tint, filters, effects, comparing = false, onStartCamera, cameraStarting = false, cameraDisabled = false, onFaceTrackingState, onProcessingState }: CameraPreviewProps) {
+export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, splitCamera = false, liveText, onLiveTextChange, liveImages, onLiveImagesChange, isActive, facingMode, background, blur, tint, filters, effects, comparing = false, onStartCamera, cameraStarting = false, cameraDisabled = false, onFaceTrackingState, onProcessingState }: CameraPreviewProps) {
+  const liveImagesRef = useRef(liveImages);
+  liveImagesRef.current = liveImages;
   const liveTextRef = useRef(liveText);
   liveTextRef.current = liveText;
   const splitSettings = useRef({ splitCamera, layout });
@@ -146,6 +150,7 @@ export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, 
                     { x: stacked ? 0 : width, y: 0, width, height });
                 }
                 context.drawImage(scene, 0, 0);
+                drawLiveImages(context, liveImagesRef.current, canvas.width, canvas.height);
                 drawLiveText(context, liveTextRef.current, canvas.width, canvas.height);
                 if (!ready) { ready = true; onProcessingState?.('ready'); }
               }
@@ -172,6 +177,7 @@ export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, 
     <video ref={secondaryVideoRef} className={styles.sourceVideo} autoPlay playsInline muted />
     <canvas ref={canvasRef} className={styles.canvas} width={layout === 'portrait' ? 720 : 1280} height={layout === 'landscape' ? 720 : 1280} />
     {isActive && comparing && <><video ref={originalRef} className={styles.originalPreview} style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : undefined }} autoPlay playsInline muted /><span className={styles.originalLabel}>Original preview</span></>}
+    {isActive && !comparing && onLiveImagesChange && liveImages?.map((image) => <LiveImageHandle key={image.id} value={image} width={layout === 'portrait' ? 720 : 1280} height={layout === 'landscape' ? 720 : 1280} onChange={(next) => onLiveImagesChange(liveImages.map((item) => item.id === next.id ? next : item))} />)}
     {isActive && !comparing && liveText && onLiveTextChange && <LiveTextHandle value={liveText} width={layout === 'portrait' ? 720 : 1280} height={layout === 'landscape' ? 720 : 1280} onChange={onLiveTextChange} />}
     {!isActive && <div className={styles.overlay}>
       <button type="button" data-camera-start className={styles.cameraOrb} aria-label="Start camera preview" disabled={cameraDisabled || cameraStarting} onClick={onStartCamera}><svg aria-hidden="true" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="m8 5 2-2h4l2 2h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" /><circle cx="12" cy="13" r="4" /></svg></button>

@@ -75,9 +75,11 @@ function fixture() {
   const audioContexts = [];
   const track = () => ({ stopped: false, stop() { this.stopped = true; }, clone: track });
   const node = () => ({ connections: [], connect(other) { this.connections.push(other); }, disconnect() {} });
+  const param = (value) => ({ value, setTargetAtTime(next) { this.value = next; } });
   globalThis.AudioContext = class {
-    constructor() { this.sources = []; this.destination = node(); audioContexts.push(this); }
-    createGain() { return { ...node(), gain: { value: 1 } }; }
+    constructor() { this.currentTime = 0; this.sources = []; this.destination = node(); audioContexts.push(this); }
+    createGain() { return { ...node(), gain: param(1) }; }
+    createBiquadFilter() { return { ...node(), frequency: param(350), Q: param(1), type: 'lowpass' }; }
     createMediaStreamDestination() { const output = track(); return { ...node(), stream: { getAudioTracks: () => [output], getTracks: () => [output] } }; }
     createMediaElementSource(element) { const source = { ...node(), element }; this.sources.push(source); return source; }
     async resume() {}
@@ -171,14 +173,14 @@ test('editor controls forward uploaded media, trim/crop, mix and overlays to MP4
   globalThis.editorModel = model;
   globalThis.Image = class { naturalWidth = 100; naturalHeight = 100; async decode() {} };
   globalThis.GaugeSlider = (await load('../src/components/GaugeSlider.tsx', (source) =>
-    `const React = globalThis.React; const { useId, useRef, useState } = React; const Icon = () => null; const MotionToggle = () => null;\n` + source.replace(/^import .*;$/gm, ''))).GaugeSlider;
+    `const React = globalThis.React; const { useId, useRef, useState } = React; const Icon = () => null; const EmojiPicker = () => null; const ColorPicker = () => null; const MotionToggle = () => null;\n` + source.replace(/^import .*;$/gm, ''))).GaugeSlider;
   const { default: Editor } = await load('../src/editor/VideoEditor.tsx', (source) => source
     .replace(/^import .*;$/gm, '')
     .replace('function Tool(', `const React = globalThis.React;
       const { useEffect, useRef, useState } = React;
       const { clamp, defaultSettings } = globalThis.editorModel;
       const EditorEngine = globalThis.EditorUiEngine;
-      const Icon = () => null; const MotionToggle = () => null;
+      const Icon = () => null; const EmojiPicker = () => null; const ColorPicker = () => null; const MotionToggle = () => null;
       const GaugeSlider = globalThis.GaugeSlider;
       const Modal = ({ children }) => React.createElement('section', {}, children);
       function Tool(`));
@@ -197,6 +199,11 @@ test('editor controls forward uploaded media, trim/crop, mix and overlays to MP4
   await act(async () => input('Overlay content').props.onChange({ target: { value: 'My title' } }));
   await act(async () => input('Add emoji').props.onClick());
   await act(async () => input('Overlay image file').props.onChange({ target: { files: [file('logo.png', 'image/png')], value: '' } }));
+  await act(async () => input('Opacity').props.onChange({ target: { value: '35' } }));
+  const surface = { setPointerCapture() {}, getBoundingClientRect: () => ({ left: 10, top: 20, width: 640, height: 360 }) };
+  await act(async () => input('Edited video preview').props.onPointerDown({ button: 0, pointerId: 1, currentTarget: surface, clientX: 330, clientY: 200 }));
+  await act(async () => input('Edited video preview').props.onPointerMove({ pointerId: 1, currentTarget: surface, clientX: 490, clientY: 110 }));
+  await act(async () => input('Edited video preview').props.onPointerUp());
   await act(async () => input('Crop video').props.onClick());
   await act(async () => renderer.root.findAllByType('button').find((button) => button.children.includes('1:1')).props.onClick());
   await act(async () => input('Video frame').props.onClick());
@@ -210,6 +217,9 @@ test('editor controls forward uploaded media, trim/crop, mix and overlays to MP4
   assert.equal(edit.settings.frame, 'polaroid');
   assert.deepEqual(edit.settings.overlays.map((item) => item.kind), ['text', 'emoji', 'image']);
   assert.equal(edit.settings.overlays[0].text, 'My title');
+  assert.equal(edit.settings.overlays[2].opacity, 35);
+  assert.equal(edit.settings.overlays[2].x, 75);
+  assert.equal(edit.settings.overlays[2].y, 25);
   assert.deepEqual(edit.layers.map((item) => item.volume), [20, 70]);
   assert.ok(input('Save edited MP4'));
   await act(async () => renderer.unmount());
@@ -233,4 +243,41 @@ test('hiding the page cancels MP4 export rather than returning incomplete video'
   await turn(); document.hidden = true; document.dispatchEvent(new Event('visibilitychange'));
   await rejected;
   assert.ok(f.tracks.every((track) => track.stopped)); engine.dispose();
+});
+
+test('noise reduction processes original audio for preview/export and zero bypasses it', async () => {
+  const f = fixture(); const { EditorEngine } = await engineModule();
+  const engine = new EditorEngine(f.canvas);
+  await engine.load('video'); engine.settings.end = 8; engine.settings.noiseReduction = 100;
+  await engine.play();
+  const videoGain = f.audioContexts[0].sources[0].connections[0];
+  const [dry, highpass] = videoGain.connections;
+  const lowpass = highpass.connections[0], wet = lowpass.connections[0];
+  assert.equal(dry.gain.value, 0); assert.equal(wet.gain.value, 1);
+  assert.equal(highpass.type, 'highpass'); assert.equal(highpass.frequency.value, 200);
+  assert.equal(lowpass.type, 'lowpass'); assert.equal(lowpass.frequency.value, 4000);
+  assert.equal(dry.connections[0], wet.connections[0]);
+  assert.equal(wet.connections[0].connections.length, 2);
+  engine.settings.noiseReduction = 40; f.tick();
+  assert.equal(dry.gain.value, .6); assert.equal(wet.gain.value, .4);
+  engine.settings.noiseReduction = 0; f.tick();
+  assert.equal(dry.gain.value, 1); assert.equal(wet.gain.value, 0);
+  engine.dispose();
+});
+
+test('overlay opacity affects drawing without fading the next layer or video frame', () => {
+  const { ctx } = drawing();
+  const alpha = [], stack = [];
+  ctx.globalAlpha = 1;
+  ctx.save = () => stack.push(ctx.globalAlpha);
+  ctx.restore = () => { ctx.globalAlpha = stack.pop(); };
+  ctx.drawImage = () => alpha.push(ctx.globalAlpha);
+  ctx.fillRect = () => alpha.push(ctx.globalAlpha);
+  const image = { naturalWidth: 100, naturalHeight: 50 };
+  const item = { kind: 'image', text: '', x: 50, y: 50, size: 30, color: '#fff', image };
+  drawEditorFrame(ctx, { videoWidth: 1280, videoHeight: 720 }, {
+    ...defaultSettings(), frame: 'border', overlays: [{ ...item, opacity: 35 }, { ...item, opacity: 0 }, item],
+  });
+  assert.deepEqual(alpha.slice(0, 4), [1, .35, 0, 1]);
+  assert.ok(alpha.slice(4).every((value) => value === 1));
 });

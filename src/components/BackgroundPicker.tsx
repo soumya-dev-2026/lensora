@@ -1,3 +1,4 @@
+import { ColorPicker } from './ColorPicker';
 import { SwipeSlider } from './SwipeSlider';
 import { GaugeSlider } from './GaugeSlider';
 import { useEffect, useState } from 'react';
@@ -100,9 +101,7 @@ export function BackgroundPicker({ selected, onSelect, blur, tint, onBlur, onTin
         <button disabled={locked} aria-pressed={selected.kind === 'blur'} onClick={() => { onSelect({ kind: 'blur', value: '' }); if (selected.kind !== 'blur' && blur === 0) onBlur(35); }}><Icon name="blur" />Blur</button>
         <button disabled={locked} aria-pressed={selected.kind === 'color'} onClick={() => { onSelect({ kind: 'color', value: color }); }}><Icon name="palette" />Color</button>
       </div>
-      {selected.kind === 'color' && <label className={styles.colorRow}>Background color
-          <input aria-label="Background color" type="color" value={color} onChange={(event) => { setColor(event.target.value); onSelect({ kind: 'color', value: event.target.value }); }} />
-      </label>}
+      {selected.kind === 'color' && <ColorPicker label="Background color" value={selected.value} disabled={locked} onChange={(color) => { setColor(color); onSelect({ kind: 'color', value: color }); }} />}
         <SwipeSlider label="Background presets" className={styles.options} selectedKey={selectedPreset}>
           {presets.map((preset, index) => <button key={preset.id} disabled={locked} onClick={() => editPreset(index)} aria-pressed={selected.kind === 'image' && selected.value === preset.src} aria-label={`${preset.name}: select and customize`}>
             <img src={preset.src} alt="" /><span>{preset.name}</span>

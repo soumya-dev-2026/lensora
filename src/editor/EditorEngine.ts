@@ -22,6 +22,11 @@ export class EditorEngine {
   private mix: GainNode | null = null;
   private videoSource: MediaElementAudioSourceNode | null = null;
   private videoGain: GainNode | null = null;
+  private noiseDry: GainNode | null = null;
+  private noiseWet: GainNode | null = null;
+  private noiseHighpass: BiquadFilterNode | null = null;
+  private noiseLowpass: BiquadFilterNode | null = null;
+  private noiseStrength = -1;
   private output: MediaStreamAudioDestinationNode | null = null;
   private frame = 0;
   private disposed = false;
@@ -103,7 +108,18 @@ export class EditorEngine {
       this.mix.connect(this.output);
       this.videoSource = this.context.createMediaElementSource(this.video);
       this.videoGain = this.context.createGain();
-      this.videoSource.connect(this.videoGain); this.videoGain.connect(this.mix);
+      this.noiseDry = this.context.createGain();
+      this.noiseWet = this.context.createGain();
+      this.noiseHighpass = this.context.createBiquadFilter();
+      this.noiseLowpass = this.context.createBiquadFilter();
+      this.noiseHighpass.type = 'highpass';
+      this.noiseLowpass.type = 'lowpass';
+      this.noiseHighpass.Q.value = this.noiseLowpass.Q.value = Math.SQRT1_2;
+      this.noiseWet.gain.value = 0;
+      this.videoSource.connect(this.videoGain);
+      this.videoGain.connect(this.noiseDry); this.noiseDry.connect(this.mix);
+      this.videoGain.connect(this.noiseHighpass); this.noiseHighpass.connect(this.noiseLowpass);
+      this.noiseLowpass.connect(this.noiseWet); this.noiseWet.connect(this.mix);
     }
     for (const sound of this.sounds.values()) {
       if (!sound.source) {
@@ -111,10 +127,24 @@ export class EditorEngine {
         sound.gain = this.context.createGain(); sound.source.connect(sound.gain); sound.gain.connect(this.mix!);
       }
     }
+    this.syncNoiseReduction();
     await this.context.resume();
   }
 
+  private syncNoiseReduction() {
+    if (!this.context || !this.noiseDry || !this.noiseWet || !this.noiseHighpass || !this.noiseLowpass) return;
+    const strength = clamp(this.settings.noiseReduction ?? 0, 0, 100) / 100;
+    if (strength === this.noiseStrength) return;
+    this.noiseStrength = strength;
+    const now = this.context.currentTime;
+    this.noiseDry.gain.setTargetAtTime(1 - strength, now, .025);
+    this.noiseWet.gain.setTargetAtTime(strength, now, .025);
+    this.noiseHighpass.frequency.setTargetAtTime(70 + 130 * strength, now, .025);
+    this.noiseLowpass.frequency.setTargetAtTime(14000 - 10000 * strength, now, .025);
+  }
+
   private syncAudio(time: number, play: boolean) {
+    this.syncNoiseReduction();
     if (this.videoGain) this.videoGain.gain.value = this.settings.muted ? 0 : 1;
     for (const layer of this.layers) {
       const sound = this.sounds.get(layer.id);
@@ -244,6 +274,8 @@ export class EditorEngine {
     this.sounds.forEach((_, id) => this.removeAudio(id));
     this.video.removeAttribute('src'); this.video.load();
     this.videoSource?.disconnect(); this.videoGain?.disconnect(); this.mix?.disconnect();
+    this.noiseDry?.disconnect(); this.noiseWet?.disconnect();
+    this.noiseHighpass?.disconnect(); this.noiseLowpass?.disconnect();
     this.output?.stream.getTracks().forEach((track) => track.stop());
     if (this.context) void this.context.close().catch(() => {});
   }

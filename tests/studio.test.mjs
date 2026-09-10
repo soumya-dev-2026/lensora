@@ -107,12 +107,12 @@ test('closing save preserves the clip on cancel; delete clears it and restarts t
       const readPreference = (key, fallback = true) => key === 'countdown' ? false : fallback;
       const writePreference = () => {};
       const MicrophoneMeter = () => null, CompareButton = () => null, SavedLooks = () => null, MotionToggle = () => null, RecordingCountdown = () => null;
-      const DEFAULT_LIVE_TEXT = { enabled: false }; const LiveTextControls = () => null;
+      const DEFAULT_LIVE_TEXT = { enabled: false }; const LiveTextControls = () => null; const LiveImageControls = () => null;
     const BACKGROUNDS = [{ src: 'studio.svg' }];
       const DEFAULT_FILTERS = {};
       const DEFAULT_EFFECTS = {};
       const CameraPreview = () => null, BackgroundPicker = () => null, CameraFilters = () => null, CameraEffects = () => null;
-      const Icon = () => null;
+      const Icon = () => null; const ColorPicker = () => null;
       const GaugeSlider = globalThis.GaugeSlider;
       const SwipeSlider = ({ children }) => React.createElement('div', {}, children);
       const Modal = ({ title, children, onClose, open = true }) => open ? React.createElement('section', { title, onClose }, children) : null;
@@ -125,7 +125,7 @@ test('closing save preserves the clip on cancel; delete clears it and restarts t
   preview.props.canvasRef.current = { captureStream: () => ({ addTrack() {}, getTracks: () => [] }) };
   await act(async () => preview.props.onProcessingState('ready'));
   const button = (label) => renderer.root.findByProps({ 'aria-label': label });
-  for (const [label, tab] of [['Background filters', 'background'], ['Camera filters', 'filters'], ['Camera effects', 'effects']]) {
+  for (const [label, tab] of [['Background filters', 'background'], ['Camera filters', 'filters']]) {
     await act(async () => button(label).props.onClick());
     assert.equal(renderer.root.findAllByType('section').filter((node) => node.props.title === 'Studio settings').length, 1);
     assert.equal(renderer.root.findByProps({ id: `studio-tab-${tab}` }).props['aria-selected'], true);
@@ -142,12 +142,18 @@ test('closing save preserves the clip on cancel; delete clears it and restarts t
   await act(async () => button('Start recording').props.onClick());
   assert.equal(renderer.root.findAllByProps({ 'aria-label': 'Open video editor' }).length, 0);
   assert.equal(renderer.root.findAllByProps({ 'aria-label': 'Split camera' }).length, 0);
-  await act(async () => button('Live text').props.onClick());
+  assert.equal(renderer.root.findByProps({ className: 'top-left' }).findAllByType('button').length, 2);
+  await act(async () => button('Background filters').props.onClick());
+  await act(async () => renderer.root.findByProps({ id: 'studio-tab-text' }).props.onClick());
   assert.equal(renderer.root.findByProps({ id: 'studio-panel-text' }).props.hidden, false);
-  const textControls = renderer.root.find((node) => typeof node.props.onPosition === 'function');
+  const textControls = renderer.root.find((node) => typeof node.props.onPosition === 'function' && !Array.isArray(node.props.value));
   await act(async () => textControls.props.onChange({ ...textControls.props.value, enabled: true, text: 'Live recording caption', color: '#ff0088', opacity: 60 }));
   assert.equal(preview.props.liveText.text, 'Live recording caption');
   assert.equal(preview.props.liveText.opacity, 60);
+  const imageControls = renderer.root.find((node) => typeof node.props.onPosition === 'function' && Array.isArray(node.props.value));
+  await act(async () => imageControls.props.onChange([{ id: 'logo', enabled: true, opacity: 40, x: 25, y: 75 }]));
+  assert.equal(preview.props.liveImages[0].opacity, 40);
+  assert.equal(preview.props.liveImages[0].x, 25);
   await act(async () => textControls.props.onPosition());
   await act(async () => button('Pause recording').props.onClick());
   assert.equal(renderer.root.findAllByProps({ 'aria-label': 'Open video editor' }).length, 0);
@@ -178,13 +184,13 @@ test('effects panel updates independent settings, disables controls, and resets 
   const { DEFAULT_EFFECTS } = await load('../src/types/effects.ts');
   globalThis.effectDefaults = DEFAULT_EFFECTS;
   globalThis.GaugeSlider = (await load('../src/components/GaugeSlider.tsx', (source) =>
-    `const React = globalThis.React; const { useId, useRef, useState } = React; const Icon = () => null;\n` + source.replace(/^import .*;$/gm, ''))).GaugeSlider;
+    `const React = globalThis.React; const { useId, useRef, useState } = React; const Icon = () => null; const ColorPicker = () => null;\n` + source.replace(/^import .*;$/gm, ''))).GaugeSlider;
   const { CameraEffects } = await load('../src/components/CameraEffects.tsx', (source) => source
     .replace(/^import .*;$/gm, '')
     .replace('export function CameraEffects', `const React = globalThis.React;
       const { useId, useState } = React;
       const DEFAULT_EFFECTS = globalThis.effectDefaults;
-      const Icon = () => null;
+      const Icon = () => null; const ColorPicker = () => null;
       const GaugeSlider = globalThis.GaugeSlider;
       const SwipeSlider = ({ children }) => React.createElement('div', {}, children);
       const Modal = ({ children }) => React.createElement('section', {}, children);

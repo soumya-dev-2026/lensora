@@ -22,7 +22,7 @@
 .modes button[aria-pressed=true], .options button[aria-pressed=true] { color: #a6fff3; border-color: #6affeb; background: linear-gradient(120deg, #147b7980, #0b35435c); box-shadow: inset 0 0 0 1px #6affeb, 0 0 16px #48f6db26; }
 .options { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .options button { position: relative; min-width: 0; border-color: #80b5d65c; color: #b5d7ee; padding-bottom: 12px; }
-.options img { height: auto; aspect-ratio: 1.35; }
+.options img { height: 64px; aspect-ratio: auto; }
 .options span { font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
 .selectedBadge { position: absolute; top: 7px; right: 7px; width: 19px; height: 19px; display: grid; place-items: center; border-radius: 50%; background: #9dfff0; color: #08232e; box-shadow: 0 2px 8px #0004; }
 .editActions .upload { background: var(--glass-control); border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }

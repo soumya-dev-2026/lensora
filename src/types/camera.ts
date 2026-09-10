@@ -1,3 +1,4 @@
+import type { LiveImage } from '../rendering/liveImages';
 /**
  * Camera-related type definitions
  */
@@ -57,6 +58,8 @@ export interface CameraPreviewProps {
   canvasRef: React.RefObject<HTMLCanvasElement>;
   secondaryVideoRef?: React.RefObject<HTMLVideoElement>;
   splitCamera?: boolean;
+  liveImages?: LiveImage[];
+  onLiveImagesChange?: (value: LiveImage[]) => void;
   liveText?: LiveText;
   onLiveTextChange?: (value: LiveText) => void;
   isActive: boolean;

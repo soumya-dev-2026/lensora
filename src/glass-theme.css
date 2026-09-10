@@ -1,7 +1,7 @@
 :root {
   --glass-panel: linear-gradient(135deg, #193347a8, #081923ad);
   --glass-control: linear-gradient(135deg, #26465b70, #0b1d2b80);
-  --glass-border: #78bce344;
+  --glass-border: #78f5e32e;
   --glass-highlight: #c7efff12;
   --glass-shadow: inset 0 1px 0 var(--glass-highlight), 0 8px 24px #0002;
   --aqua: #78f5e3;
@@ -71,39 +71,41 @@ html[data-motion=off] .studio-editor-launcher:active { transform: none !importan
 .studio .sidebar > .modal-heading { padding: max(22px, env(safe-area-inset-top)) 20px 22px; }
 .studio .sidebar:has(.studio-settings-slider) { padding: max(12px, env(safe-area-inset-top)) 0 12px; }
 .studio .sidebar:has(.studio-settings-slider) > .modal-heading {
-  margin: 0 14px 14px; padding: 18px 14px;
+  margin: 0 10px 10px; padding: 12px 10px;
   border: 1px solid var(--glass-border); border-radius: 14px;
   background: linear-gradient(120deg, #102d3c88, #06172388);
   box-shadow: var(--glass-shadow);
 }
 .studio .sidebar-content { scrollbar-width: none; scrollbar-gutter: auto; container-type: inline-size; }
-.studio .sidebar-content:has(> .studio-settings-slider) { padding: 0 14px 12px; }
+.studio .sidebar-content:has(> .studio-settings-slider) { padding: 0 10px 10px; }
 .studio .sidebar-content::-webkit-scrollbar { display: none; }
 .studio .studio-settings-slider {
-  top: 0; margin: 0 0 12px;
-  border: 1px solid var(--glass-border); border-radius: 14px;
-  box-shadow: var(--glass-shadow);
-  background: linear-gradient(120deg, #102735e8, #081924e8);
+  top: 0; margin: 0;
+  border: 1px solid #6ca8c94d; border-bottom: 0; border-radius: 14px 14px 0 0;
+  box-shadow: inset 0 1px 0 #c7efff12;
+  background: #0b2330;
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
 }
-.studio .studio-settings-tabs { padding: 9px 28px; scroll-padding-inline: 28px; gap: 8px; }
-.studio .studio-settings-tabs button { border: 1px solid var(--glass-border); border-radius: 12px; min-height: 48px; padding-inline: 14px; color: #cdebf5; }
+.studio .studio-settings-tabs { padding: 6px 28px 0; scroll-padding-inline: 28px; gap: 6px; }
+.studio .studio-settings-tabs button { border: 1px solid transparent; border-bottom: 0; border-radius: 10px 10px 0 0; min-height: 44px; padding-inline: 10px; color: #cdebf5; }
 .studio .studio-settings-tabs button::before { display: none; }
 .studio .studio-settings-tabs button[aria-selected=true] {
   color: #03232b;
-  background: linear-gradient(115deg, #a2fff0f5, #62eddcf0);
-  border-color: #aaffefcc;
-  box-shadow: inset 0 0 0 1px #c7fff599, inset 0 1px 8px #ffffff44, 0 0 18px #47eddb40;
+  background: linear-gradient(115deg, #a2fff0, #62eddc);
+  border-color: #8affed;
+  box-shadow: inset 0 1px 0 #e5fff9, 0 0 14px #47eddb33;
 }
 .studio .studio-slider-arrow { top: 50%; color: #b0fff5; background: #0c202ddb; border-radius: 9px; }
 .studio .studio-tab-content {
-  padding: 14px 12px 24px;
-  border: 1px solid #6ca8c94d;
-  border-radius: 16px;
-  background: linear-gradient(130deg, #0e29354d, #06131e66);
-  box-shadow: inset 0 1px 0 #b0e9ff08;
+  position: relative;
+  padding: 10px 8px 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: 0 0 16px 16px;
+  background: #10313e;
+  box-shadow: inset 0 1px 0 #a2fff00a, 0 4px 14px #0002;
 }
+
 .studio :is(.filter-tabs, .effects-category-tabs) { background: transparent; border: 0; padding: 0; gap: 8px; }
 .studio .effects-category-tabs button { min-height: 52px; border-radius: 12px; border: 1px solid var(--glass-border); color: #c7e4fa; }
 .studio .studio-tab-content .muted { color: var(--glass-muted); font-size: 12px; line-height: 1.65; margin-block: 14px; }
@@ -123,7 +125,6 @@ html[data-motion=off] .studio-editor-launcher:active { transform: none !importan
 }
 .studio .orientation-check svg { stroke-width: 2.5; }
 .modal-heading-actions { display: flex; gap: 6px; flex: none; }
-.sidebar-expand { display: none; }
 .studio-utility-panel { margin-top: 12px; padding: 12px; border: 1px solid var(--glass-border); border-radius: 14px; background: var(--glass-panel); font-size: 12px; }
 .studio-utility-panel summary { min-height: 44px; align-content: center; cursor: pointer; color: #d4f3ff; font-weight: 600; }
 .studio-utility-panel > button { margin-top: 10px; width: 100%; }
@@ -172,8 +173,6 @@ html[data-motion=off] .studio-editor-launcher:active { transform: none !importan
 .countdown-number { width: 130px; height: 130px; display: grid; place-items: center; border: 1px solid #75ffe8; border-radius: 50%; background: #0b3036a8; color: #a5fff2; font-size: 72px; box-shadow: 0 0 35px #17eac333; }
 .recording-countdown > div:last-child { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
 @media (max-width: 600px) {
-  .studio .sidebar-expand { display: inline-flex; }
-  .studio .modal.sidebar[data-expanded=true] { width: 100vw; }
   .studio .sidebar:has(.studio-settings-slider) .modal-heading { flex-wrap: wrap; }
   .studio .sidebar:has(.studio-settings-slider) .modal-heading-actions { margin-left: auto; }
   .studio .compare-button { top: 80px; }
@@ -197,6 +196,8 @@ html[data-motion=off] .studio-editor-launcher:active { transform: none !importan
 }
 :is(.studio, .video-editor) .gauge-control {
   container-type: inline-size;
+  width: 100%;
+  grid-column: 1 / -1;
   flex-wrap: wrap;
   border-color: #78bce35c;
   border-radius: 14px;
@@ -205,7 +206,7 @@ html[data-motion=off] .studio-editor-launcher:active { transform: none !importan
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
 }
-:is(.studio, .video-editor) .gauge-caption { flex: 1 1 120px; gap: 9px; }
+:is(.studio, .video-editor) .gauge-caption { flex: 1 1 100%; width: 100%; gap: 9px; }
 :is(.studio, .video-editor) .gauge-caption label { justify-content: flex-start; color: #f0faff; font-size: 14px; font-weight: 550; }
 :is(.studio, .video-editor) .gauge-hint { color: var(--glass-muted); font-size: 11px; }
 :is(.studio, .video-editor) .gauge-dial { width: min(170px, 100%); height: auto; aspect-ratio: 1; flex: 0 1 170px; margin-inline: auto; }
@@ -226,7 +227,7 @@ html[data-motion=off] .studio-editor-launcher:active { transform: none !importan
 .gauge-dial .gauge-limit, .gauge-dial .gauge-unit { fill: #a9d3ec; }
 .studio .gauge-caption label > svg { box-sizing: content-box; padding: 6px; border: 1px solid #78bce344; border-radius: 50%; background: #0c304078; }
 .studio .gauge-step-buttons button { width: 44px; height: 44px; }
-.studio .gauge-control { padding-block: 20px; }
+.studio .gauge-control { padding: 10px; gap: 8px; }
 
 .video-editor { background: radial-gradient(ellipse at 15% 10%, #15485366, transparent 45%), radial-gradient(ellipse at 90% 80%, #153b5866, transparent 50%), #06121c; }
 .video-editor :is(.editor-header, .editor-inspector, .editor-toolbar, .editor-timeline) {
@@ -242,7 +243,6 @@ html[data-motion=off] .studio-editor-launcher:active { transform: none !importan
   .studio .studio-tab-content { padding: 10px 8px; }
   .studio .gauge-control { padding: 10px; gap: 14px; }
   .studio .gauge-caption { flex-basis: 100%; }
-  .studio .gauge-preview { max-height: 105px; }
   .studio .effect-gauge-pair { grid-template-columns: minmax(0, 1fr); }
   .studio .filter-tabs { flex-wrap: wrap; }
   .studio .filter-tabs button { flex-basis: 100%; }
@@ -257,7 +257,7 @@ html[data-motion=off] .studio-editor-launcher:active { transform: none !importan
   .studio .modal-heading .icon-button { width: 44px; height: 44px; }
   .studio .sidebar:has(.studio-settings-slider) > .modal-heading { margin: 0 8px 10px; padding: 12px 10px; }
   .studio .sidebar-content:has(> .studio-settings-slider) { padding-inline: 8px; }
-  .studio .studio-settings-slider { margin-bottom: 10px; }
+  .studio .studio-settings-slider { margin-bottom: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   :is(.studio, .video-editor) button { transition: none; }
@@ -388,7 +388,7 @@ html[data-motion=off] .studio-editor-launcher:active { transform: none !importan
 }
 
 /* Utility cards share the sidebar's glass and aqua palette. */
-.studio .studio-utility-panel { padding: 16px; margin-top: 16px; border-radius: 16px; background: linear-gradient(145deg, #1b3c4d80, #061824b3); box-shadow: inset 0 1px 0 #c0f8ff12, 0 10px 24px #0002; }
+.studio .studio-utility-panel { padding: 12px; margin-top: 10px; border-radius: 16px; background: linear-gradient(145deg, #1b3c4d80, #061824b3); box-shadow: inset 0 1px 0 #c0f8ff12, 0 10px 24px #0002; }
 .studio-utility-panel > summary { align-items: flex-start; gap: 12px; padding-block: 2px; }
 .studio-utility-panel > summary::after { margin-top: 13px; }
 .utility-heading-icon { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; border-radius: 12px; color: #d6fff8; background: linear-gradient(140deg, #229e9bd9, #095565b3); border: 1px solid #83f8e74d; box-shadow: inset 0 1px 0 #b1ffef33, 0 0 16px #1bd4c01a; }
@@ -464,3 +464,47 @@ html[data-motion=off] .studio-editor-launcher:active { transform: none !importan
 @media (max-width: 380px) {
   .studio > :is(.top-left, .top-right) { gap: 2px; padding: 4px; }
 }
+
+/* Compact settings keep each control full width inside a narrower panel. */
+.studio .sidebar .modal-title h2 { font-size: 17px; }
+.studio .sidebar .modal-title p { margin: 4px 0 0; font-size: 11px; }
+.studio .sidebar .sliders { gap: 10px; margin-top: 14px; }
+.studio .sidebar .gauge-control { display: grid; grid-template-columns: minmax(0, 1fr) 112px; align-items: center; text-align: left; }
+.studio .sidebar .gauge-caption { display: grid; gap: 6px; }
+.studio .sidebar .gauge-caption label { grid-row: auto; flex-direction: row; font-size: 12px; gap: 6px; }
+.studio .sidebar .gauge-caption label > svg { padding: 4px; width: 17px; height: 17px; }
+.studio .sidebar .gauge-dial { grid-row: auto; width: 112px; height: 112px; }
+.studio .sidebar .gauge-preview { display: none; }
+.studio .sidebar .gauge-hint { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.studio .sidebar .gauge-step-buttons { grid-row: auto; gap: 6px; }
+.studio .sidebar .utility-heading-copy strong { font-size: 14px; }
+.studio .sidebar .utility-heading-copy small { margin-top: 4px; font-size: 11px; }
+@container (max-width: 250px) {
+  .studio .sidebar .gauge-control { grid-template-columns: minmax(0, 1fr); justify-items: stretch; }
+}
+
+.studio .sidebar .studio-utility-panel:not([open]) { padding-block: 8px; }
+.studio .sidebar .studio-utility-panel:not([open]) .utility-heading-copy small { display: none; }
+.studio .sidebar .studio-utility-panel:not([open]) > summary { align-items: center; }
+.studio .sidebar .studio-utility-panel:not([open]) > summary::after { margin-top: 0; }
+
+.studio .studio-settings-tabs button:not([aria-selected=true]) { background: transparent; box-shadow: none; }
+.studio .studio-settings-tabs button:hover { translate: none; }
+
+/* A quiet mint rim ties bordered surfaces together without competing with content. */
+:where(.studio, .video-editor) :where(button:not([data-camera-start]), .gauge-control, .studio-tab-content, .studio-utility-panel, .preference-card, .modal-heading, .top-left, .top-right, .editor-preview, .editor-timeline, .editor-notice, .editor-export, .color-picker-panel, .live-text-sample, .live-image-list) { position: relative; }
+:is(.studio, .video-editor) :is(button:not([data-camera-start]), .gauge-control, .studio-tab-content, .studio-utility-panel, .preference-card, .modal-heading, .top-left, .top-right, .editor-preview, .editor-timeline, .editor-notice, .editor-export, .color-picker-panel, .live-text-sample, .live-image-list)::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(140deg, #a2fff014, #78f5e306 35%, #62eddc18 65%, #a2fff066 83%, #78f5e310);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+:is(.studio, .video-editor) :is(.gauge-control, .studio-utility-panel, .preference-card, .editor-preview, .editor-timeline, .color-picker-panel) { border-color: var(--glass-border); }
+:is(.studio, .video-editor) :is(select, textarea, input:not([type=range]):not([type=checkbox])) { border-color: var(--glass-border); box-shadow: inset 0 -1px 0 #78f5e326, inset 0 1px 0 #a2fff00a, 0 2px 8px #0002; }

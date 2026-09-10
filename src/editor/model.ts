@@ -1,14 +1,14 @@
 export interface Crop { x: number; y: number; width: number; height: number }
 export interface Overlay {
   id: string; kind: 'text' | 'emoji' | 'image'; text: string; x: number; y: number;
-  size: number; color: string; image?: HTMLImageElement; url?: string;
+  size: number; opacity?: number; color: string; image?: HTMLImageElement; url?: string;
 }
 export interface AudioLayer { id: string; name: string; url: string; volume: number; start: number; duration: number }
 export interface EditSettings {
-  start: number; end: number; muted: boolean; crop: Crop; overlays: Overlay[];
+  start: number; end: number; muted: boolean; noiseReduction: number; crop: Crop; overlays: Overlay[];
   frame: 'none' | 'border' | 'cinema' | 'polaroid'; frameColor: string; frameWidth: number;
 }
-export const defaultSettings = (): EditSettings => ({ start: 0, end: 0, muted: false,
+export const defaultSettings = (): EditSettings => ({ start: 0, end: 0, muted: false, noiseReduction: 0,
   crop: { x: 0, y: 0, width: 100, height: 100 }, overlays: [], frame: 'none', frameColor: '#ffffff', frameWidth: 4 });
 export const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 export function cropPixels(crop: Crop, width: number, height: number) {
@@ -33,6 +33,7 @@ export function drawEditorFrame(ctx: CanvasRenderingContext2D, video: HTMLVideoE
   ctx.drawImage(video, crop.x, crop.y, crop.width, crop.height, 0, 0, w, h);
   for (const overlay of settings.overlays) {
     ctx.save();
+    ctx.globalAlpha = clamp(overlay.opacity ?? 100, 0, 100) / 100;
     const x = overlay.x / 100 * w, y = overlay.y / 100 * h;
     if (overlay.kind === 'image' && overlay.image) {
       const width = overlay.size / 100 * w;
