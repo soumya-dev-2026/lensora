@@ -81,3 +81,64 @@ test('losing the main camera releases both streams', async () => {
   assert.equal(primary.track.stopped, true);
   assert.equal(secondary.track.stopped, true);
 });
+
+test('switch releases the front camera before requesting the exact rear camera', async () => {
+  const { manager, primary, secondary, requests } = await fixture((first, second) => {
+    assert.equal(first.track.stopped, true);
+    return second;
+  });
+  await manager.switchCamera();
+  assert.deepEqual(requests[1].video.facingMode, { exact: 'environment' });
+  assert.equal(manager.getState().stream, secondary);
+  assert.equal(manager.getState().facingMode, 'environment');
+  manager.stop();
+});
+
+test('failed switch reacquires the previous camera instead of restoring a stopped stream', async () => {
+  const recovered = stream('front');
+  let attempts = 0;
+  const { manager, primary } = await fixture(() => {
+    if (++attempts === 1) throw new DOMException('busy', 'NotReadableError');
+    return recovered;
+  });
+  await assert.rejects(manager.switchCamera());
+  assert.equal(primary.track.stopped, true);
+  assert.equal(manager.getState().stream, recovered);
+  assert.equal(manager.getState().isActive, true);
+  assert.equal(manager.getState().facingMode, 'user');
+  manager.stop();
+});
+
+test('split waits for a second camera to unmute during sensor startup', async () => {
+  const { manager, secondary } = await fixture((_first, second) => {
+    second.track.muted = true;
+    setTimeout(() => { second.track.muted = false; second.track.dispatchEvent(new Event('unmute')); }, 10);
+    return second;
+  });
+  await manager.startSplitCamera();
+  assert.equal(manager.getState().secondaryStream, secondary);
+  assert.equal(manager.getState().splitError, null);
+  manager.stop();
+});
+
+test('split requests the opposite facing camera when WebView omits device IDs', async () => {
+  const { manager, primary, requests, secondary } = await fixture();
+  primary.track.getSettings = () => ({});
+  navigator.mediaDevices.enumerateDevices = async () => [];
+  await manager.startSplitCamera();
+  assert.deepEqual(requests[1].video.facingMode, { exact: 'environment' });
+  assert.equal(manager.getState().secondaryStream, secondary);
+  manager.stop();
+});
+
+test('split prefers the opposite facing camera over another same-facing lens', async () => {
+  const { manager, requests } = await fixture();
+  navigator.mediaDevices.enumerateDevices = async () => [
+    { kind: 'videoinput', deviceId: 'front', label: 'Front camera' },
+    { kind: 'videoinput', deviceId: 'front-wide', label: 'Front wide camera' },
+    { kind: 'videoinput', deviceId: 'rear', label: 'Back camera' },
+  ];
+  await manager.startSplitCamera();
+  assert.deepEqual(requests[1].video.deviceId, { exact: 'rear' });
+  manager.stop();
+});

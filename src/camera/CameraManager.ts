@@ -66,7 +66,7 @@ export class CameraManager {
   /**
    * Request and start the camera
    */
-  async start(options: Partial<CameraOptions> = {}): Promise<void> {
+  async start(options: Partial<CameraOptions> = {}, requireFacing = false): Promise<void> {
     if (this.isActive) {
       return;
     }
@@ -78,7 +78,7 @@ export class CameraManager {
 
       const constraints: MediaStreamConstraints = {
         video: {
-          facingMode: this.facingMode,
+          facingMode: requireFacing ? { exact: this.facingMode } : this.facingMode,
           width: options.width || { ideal: 1280 },
           height: options.height || { ideal: 720 },
           frameRate: options.frameRate || { ideal: 30 },
@@ -124,19 +124,20 @@ export class CameraManager {
     const previousFacingMode = this.facingMode;
     const currentStream = this.stream;
 
+    // Mobile camera drivers often cannot open the rear camera while the front is held.
+    currentStream?.getTracks().forEach((track) => track.stop());
+    this.stream = null;
+    this.isActive = false;
+    this.notifyListeners();
     try {
-      this.isActive = false;
-      await this.start({ facingMode: newFacingMode });
-      if (currentStream) {
-        currentStream.getTracks().forEach((track) => {
-          track.stop();
-        });
-      }
+      await this.start({ facingMode: newFacingMode }, true);
     } catch (err) {
-      this.stream = currentStream;
-      this.isActive = true;
-      this.facingMode = previousFacingMode;
-      this.notifyListeners();
+      // A stopped stream cannot be restored: acquire a fresh previous-camera stream.
+      try {
+        await this.start({ facingMode: previousFacingMode });
+        this.error = 'Could not switch cameras. Returned to the previous camera.';
+        this.notifyListeners();
+      } catch { /* start() already publishes the recovery error. */ }
       throw err;
     }
   }
@@ -164,15 +165,21 @@ export class CameraManager {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       if (request !== this.splitRequest) return;
-      const other = devices.find((device) => device.kind === 'videoinput' && device.deviceId && device.deviceId !== currentId);
-      if (!currentId || !other) throw new Error('A second camera was not found. Connect or allow access to another camera.');
+      const candidates = devices.filter((device) => device.kind === 'videoinput' && device.deviceId && device.deviceId !== currentId);
+      const opposite = this.facingMode === 'user' ? 'environment' : 'user';
+      const label = opposite === 'environment' ? /back|rear|environment/i : /front|user|facetime/i;
+      const other = candidates.find((device) => label.test(device.label)) || candidates[0];
+      if (currentId && !other) throw new Error('A second camera was not found. Connect or allow access to another camera.');
       secondary = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { exact: other.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+        video: { ...(currentId && other ? { deviceId: { exact: other.deviceId } } : { facingMode: { exact: opposite } }), width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24 } },
         audio: false,
       });
       if (request !== this.splitRequest) { secondary.getTracks().forEach((track) => track.stop()); return; }
       const secondTrack = secondary.getVideoTracks()[0];
-      if (!secondTrack || secondTrack.getSettings().deviceId === currentId || primary.muted || primary.readyState === 'ended' || secondTrack.muted || secondTrack.readyState === 'ended') {
+      // Some WebViews return a muted track while the camera sensor is starting.
+      if (secondTrack) await Promise.all([primary, secondTrack].map((track) => this.waitForCamera(track)));
+      if (request !== this.splitRequest) { secondary.getTracks().forEach((track) => track.stop()); return; }
+      if (!secondTrack || (currentId && secondTrack.getSettings().deviceId === currentId) || primary.muted || primary.readyState === 'ended' || secondTrack.muted || secondTrack.readyState === 'ended') {
         throw new Error('This device cannot keep both cameras active at the same time.');
       }
       this.secondaryStream = secondary;
@@ -211,6 +218,21 @@ export class CameraManager {
         this.notifyListeners();
       }
     }
+  }
+
+  private waitForCamera(track: MediaStreamTrack): Promise<void> {
+    if (!track.muted || track.readyState === 'ended') return Promise.resolve();
+    return new Promise((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        track.removeEventListener('unmute', done);
+        track.removeEventListener('ended', done);
+        resolve();
+      };
+      const timer = setTimeout(done, 2500);
+      track.addEventListener('unmute', done);
+      track.addEventListener('ended', done);
+    });
   }
 
   /**

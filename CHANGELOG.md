@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.2.1 — 2026-09-10
+
+### Fixed
+
+- Release the active camera before switching to the opposite facing camera on mobile.
+- Reopen the previous camera if switching fails, instead of restoring a stopped stream.
+- Allow camera sensor startup time in split view, prefer an opposite-facing lens, and handle missing device IDs.
+- Reduce secondary camera capture resolution and frame rate to ease concurrent capture.
+
 ## 0.2.0 — 2026-09-10
 
 ### Added
