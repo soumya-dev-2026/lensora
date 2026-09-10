@@ -33,6 +33,25 @@ const formatTime = (ms: number) => {
   return `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
 };
 
+function getDefaultLayout(): CanvasLayout {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return 'landscape';
+
+  // iPads can identify as Macs when requesting desktop websites.
+  const mobileOrTablet = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!mobileOrTablet) return 'landscape';
+
+  const orientation = window.screen?.orientation?.type;
+  if (orientation?.startsWith('landscape')) return 'landscape';
+  if (orientation?.startsWith('portrait')) return 'portrait';
+
+  // Older iOS browsers expose the device rotation as an angle.
+  const angle = (window as Window & { orientation?: number }).orientation;
+  if (typeof angle === 'number') return Math.abs(angle) % 180 === 90 ? 'landscape' : 'portrait';
+
+  return 'portrait';
+}
+
 function App() {
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('background');
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -60,7 +79,7 @@ function App() {
   const [effects, setEffects] = useState({ ...DEFAULT_EFFECTS });
   const [filters, setFilters] = useState({ ...DEFAULT_FILTERS });
   const [faceState, setFaceState] = useState<FaceTrackingState>('off');
-  const [layout, setLayout] = useState<CanvasLayout>('portrait');
+  const [layout, setLayout] = useState<CanvasLayout>(getDefaultLayout);
   const [layoutOpen, setLayoutOpen] = useState(false);
   const [background, setBackground] = useState<BackgroundSelection>({ kind: 'image', value: BACKGROUNDS[0].src });
   const [blur, setBlur] = useState(0);
