@@ -31,6 +31,7 @@ const shapes = {
   palette: <><path d="M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1-3.7 1.5 1.5 0 0 1 1-2.8h2a4 4 0 0 0 4-4C21 6 17 3 12 3Z" /><path d="M7 10h.01M10 7h.01M15 7h.01M17 10h.01" strokeWidth="3" /></>,
   landscape: <rect x="2" y="5" width="20" height="14" rx="2" />,
   portrait: <rect x="5" y="2" width="14" height="20" rx="2" />,
+  square: <rect x="3" y="3" width="18" height="18" rx="2" />,
   expand: <path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" />,
   collapse: <path d="M3 8h5V3m8 0v5h5M8 21v-5H3m18 0h-5v5" />,
   close: <path d="m6 6 12 12M6 18 18 6" />,

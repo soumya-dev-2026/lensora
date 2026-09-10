@@ -44,7 +44,7 @@ export interface CameraState {
   error: string | null;
 }
 
-export type CanvasLayout = 'portrait' | 'landscape';
+export type CanvasLayout = 'portrait' | 'landscape' | 'square';
 
 export interface CameraPreviewProps {
   layout: CanvasLayout;

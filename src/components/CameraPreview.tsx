@@ -131,7 +131,7 @@ export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMod
 
   return <div className={`${styles.container} ${styles[layout]}`}>
     <video ref={videoRef} className={styles.sourceVideo} autoPlay playsInline muted />
-    <canvas ref={canvasRef} className={styles.canvas} width={layout === 'portrait' ? 720 : 1280} height={layout === 'portrait' ? 1280 : 720} />
+    <canvas ref={canvasRef} className={styles.canvas} width={layout === 'portrait' ? 720 : 1280} height={layout === 'landscape' ? 720 : 1280} />
     {!isActive && <div className={styles.overlay}><span>Your space. Your scene.</span><small>Start your camera to preview a background</small></div>}
     {backgroundError && <p className={styles.error} role="alert">{backgroundError}</p>}
   </div>;

@@ -20,7 +20,7 @@ const formatTime = (ms: number) => {
 function App() {
   const [filters, setFilters] = useState({ ...DEFAULT_FILTERS });
   const [faceState, setFaceState] = useState<FaceTrackingState>('off');
-  const [layout, setLayout] = useState<CanvasLayout>('landscape');
+  const [layout, setLayout] = useState<CanvasLayout>('portrait');
   const [layoutOpen, setLayoutOpen] = useState(false);
   const [background, setBackground] = useState<BackgroundSelection>({ kind: 'image', value: BACKGROUNDS[0].src });
   const [blur, setBlur] = useState(0);
@@ -261,8 +261,8 @@ function App() {
     </div>
     {layoutOpen && <Modal title="Canvas orientation" onClose={() => setLayoutOpen(false)}>
       <div className="orientation-options" role="group" aria-label="Canvas orientation">
-        {(['landscape', 'portrait'] as const).map((option) => <button key={option} disabled={busy} aria-pressed={layout === option} onClick={() => { setLayout(option); setLayoutOpen(false); }}>
-          <Icon name={option} size={36} /><span>{option === 'landscape' ? 'Landscape' : 'Portrait'}</span><small>{option === 'landscape' ? '16:9' : '9:16'}</small>
+        {(['portrait', 'landscape', 'square'] as const).map((option) => <button key={option} disabled={busy} aria-pressed={layout === option} onClick={() => { setLayout(option); setLayoutOpen(false); }}>
+          <Icon name={option} size={36} /><span>{{ portrait: 'Portrait', landscape: 'Landscape', square: 'Square' }[option]}</span><small>{{ portrait: '9:16', landscape: '16:9', square: '16:16' }[option]}</small>
         </button>)}
       </div>
     </Modal>}
