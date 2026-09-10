@@ -351,7 +351,10 @@ function App() {
       {isActive && processing === 'error' && !busy && <button className="icon-button glass" aria-label="Reset camera" title="Reset camera" onClick={stopCamera}><Icon name="reset" /></button>}
       {savedClip && !saveOpen && !discardOpen && <div className="clip-actions"><button className="icon-button glass" aria-label="Review and save video" title="Review and save video" onClick={() => setSaveOpen(true)}><Icon name="download" /></button><button className="icon-button glass" aria-label="New recording" title="New recording" onClick={requestDiscard}><Icon name="plus" /></button></div>}
     </div>
-    <a className="icon-button glass studio-editor-launcher" href="/editor" aria-disabled={busy} onClick={(event) => { if (busy) event.preventDefault(); }} aria-label="Open video editor" title="Video editor"><Icon name="wand" /></a>
+    {recordingState === 'idle' && <>
+      <a className="icon-button glass studio-editor-launcher" href="/editor" aria-disabled={busy} onClick={(event) => { if (busy) event.preventDefault(); }} aria-label="Open video editor" title="Video editor"><Icon name="wand" /></a>
+      <button className="icon-button glass studio-split-launcher" aria-label="Split camera" title={splitPending ? 'Opening second camera…' : !isActive ? 'Start the camera to enable split camera' : splitCamera ? 'Turn off split camera' : 'Turn on split camera'} aria-pressed={splitCamera} disabled={!isActive || busy || cameraStarting} onClick={() => { setComparing(false); void setSplitCamera(!splitCamera); }}><Icon name="splitCamera" /></button>
+    </>}
     <div className="record-controls">
       <button className="icon-button glass camera-toggle" aria-label={isActive ? 'Camera off' : 'Start camera'} title={isActive ? 'Camera off' : 'Start camera'} disabled={!isSupported || busy || cameraStarting} onClick={() => isActive ? stopCamera() : void startPreview()}><Icon name={isActive ? 'cameraOff' : 'camera'} /></button>
       {recordingState === 'recording' || recordingState === 'paused' ? <>
@@ -441,11 +444,11 @@ function App() {
             } finally { setNoisePending(false); }
           }} />
         </label>
-        <label className="preference-toggle preference-card">
+        {recordingState === 'idle' && <label className="preference-toggle preference-card">
           <span className="preference-icon"><Icon name="splitCamera" size={23} /></span>
           <span className="preference-copy"><strong>Split camera</strong><small>{splitPending ? 'Opening second camera…' : !isActive ? 'Start the camera to use two cameras together.' : 'Record two cameras together. Landscape: side by side. Portrait: stacked. Effects apply to the main camera.'}</small></span>
           <input type="checkbox" role="switch" checked={splitCamera} disabled={!isActive || busy} onChange={(event) => { setComparing(false); void setSplitCamera(event.target.checked); }} />
-        </label>
+        </label>}
         {splitError && <p role="alert">{splitError}</p>}
         <MotionToggle />
         </div>

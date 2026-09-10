@@ -437,3 +437,26 @@ html[data-motion=off] .studio-editor-launcher:active { transform: none !importan
 .outline-color { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid rgba(120, 245, 227, .2); border-radius: 14px; background: rgba(14, 39, 54, .55); }
 .outline-color input { width: 54px; height: 44px; padding: 5px; border: 1px solid rgba(120, 245, 227, .4); border-radius: 12px; background: transparent; cursor: pointer; }
 .outline-controls { display: grid; gap: 12px; }
+
+/* Mirror the editor shortcut with a split-camera control on the right. */
+.studio > .studio-split-launcher {
+  position: absolute;
+  z-index: 2;
+  right: max(24px, env(safe-area-inset-right));
+  bottom: max(58px, env(safe-area-inset-bottom));
+  width: 56px;
+  height: 56px;
+  color: #b3ecde;
+}
+.studio > .studio-split-launcher[aria-pressed=true] {
+  border-color: #78f5e3;
+  background: linear-gradient(130deg, #1c726caa, #133142dd);
+  box-shadow: 0 0 16px #00e4db40;
+}
+.studio > .studio-split-launcher svg { width: 25px; height: 25px; }
+@media (max-width: 600px), (max-height: 500px) {
+  .studio > .studio-split-launcher { width: 44px; height: 44px; bottom: max(18px, env(safe-area-inset-bottom)); }
+}
+@media (max-width: 600px) {
+  .studio > .studio-split-launcher { right: max(12px, env(safe-area-inset-right)); }
+}

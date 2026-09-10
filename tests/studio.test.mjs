@@ -95,6 +95,8 @@ test('closing save preserves the clip on cancel; delete clears it and restarts t
     static isTypeSupported() { return true; }
     constructor(stream) { this.stream = stream; this.state = 'inactive'; this.mimeType = 'video/mp4'; }
     start() { this.state = 'recording'; }
+    pause() { this.state = 'paused'; }
+    resume() { this.state = 'recording'; }
     stop() { this.state = 'inactive'; this.ondataavailable?.({ data: new Blob(['recorded clip']) }); this.onstop?.(); }
   };
   const { default: App } = await load('../src/App.tsx', (source) => source
@@ -134,8 +136,18 @@ test('closing save preserves the clip on cancel; delete clears it and restarts t
   assert.ok(button('Unmute microphone'));
   await act(async () => button('Unmute microphone').props.onClick());
   assert.ok(button('Mute microphone'));
+  assert.ok(button('Open video editor'));
+  assert.equal(button('Split camera').props.disabled, false);
   await act(async () => button('Start recording').props.onClick());
+  assert.equal(renderer.root.findAllByProps({ 'aria-label': 'Open video editor' }).length, 0);
+  assert.equal(renderer.root.findAllByProps({ 'aria-label': 'Split camera' }).length, 0);
+  await act(async () => button('Pause recording').props.onClick());
+  assert.equal(renderer.root.findAllByProps({ 'aria-label': 'Open video editor' }).length, 0);
+  assert.equal(renderer.root.findAllByProps({ 'aria-label': 'Split camera' }).length, 0);
+  await act(async () => button('Resume recording').props.onClick());
   await act(async () => button('Stop recording').props.onClick());
+  assert.ok(button('Open video editor'));
+  assert.equal(button('Split camera').props.disabled, false);
   const dialog = (title) => renderer.root.findByProps({ title, onClose: renderer.root.findAllByType('section').find((n) => n.props.title === title)?.props.onClose });
   const original = renderer.root.findByProps({ className: 'recorded-preview' }).props.src;
   await act(async () => dialog('Your video is ready').props.onClose());
