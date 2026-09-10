@@ -1,3 +1,4 @@
+import { SwipeSlider } from './SwipeSlider';
 import { useState } from 'react';
 import { CameraFilters as FilterSettings, DEFAULT_FILTERS, FaceTrackingState } from '../types/filters';
 import { Icon, IconName } from './Icon';
@@ -30,22 +31,22 @@ export function CameraFilters({ value, onChange, faceState }: {
   return <>
       <div className="effect-choice-group filter-looks" role="group" aria-label="Preset looks">
         <h3>Preset looks</h3>
-        <div className="effect-tiles">{(['none', 'natural', 'cinematic', 'warm', 'cool', 'vintage'] as const).map((look) => <button type="button" key={look} disabled={!value.enabled} aria-pressed={value.look === look} onClick={() => onChange({ ...value, look })}>
+        <SwipeSlider label="Preset looks" className="effect-tiles" selectedKey={value.look}>{(['none', 'natural', 'cinematic', 'warm', 'cool', 'vintage'] as const).map((look) => <button type="button" key={look} disabled={!value.enabled} aria-pressed={value.look === look} onClick={() => onChange({ ...value, look })}>
           <span className={`look-preview look-preview-${look}`} /><span>{look === 'none' ? 'Original' : look[0].toUpperCase() + look.slice(1)}</span>
           {value.look === look && <span className="selected-check"><Icon name="check" size={12} /></span>}
-        </button>)}</div>
+        </button>)}</SwipeSlider>
         {value.look !== 'none' && <GaugeSlider id="look-intensity" label="Look strength" icon="palette" value={value.lookIntensity} disabled={!value.enabled} onChange={(lookIntensity) => onChange({ ...value, lookIntensity })} />}
       </div>
       <div className="filter-tabs" role="group" aria-label="Filter category">
         <button aria-pressed={tab === 'beauty'} onClick={() => setTab('beauty')}><Icon name="sparkle" size={17} />Beauty</button>
         <button aria-pressed={tab === 'color'} onClick={() => setTab('color')}><Icon name="sliders" size={17} />Light & color</button>
       </div>
-      <div className="effect-options" role="group" aria-label={tab === 'beauty' ? 'Beauty effects' : 'Color adjustments'}>
+      <SwipeSlider key={tab} className="effect-options" label={tab === 'beauty' ? 'Face enhancements' : 'Color adjustments'} selectedKey={selected.key}>
         {controls.map((control, index) => <button key={control.key} className="effect-option" aria-label={control.label} title={control.label} aria-pressed={selected.key === control.key} onClick={() => tab === 'beauty' ? setBeautyIndex(index) : setColorIndex(index)}>
           <Icon name={control.icon} size={23} /><span>{control.label}</span>
           {value[control.key] !== 0 && <i className="effect-dot" />}
         </button>)}
-      </div>
+      </SwipeSlider>
       <div className="filter-gauge"><GaugeSlider id={`filter-${selected.key}`} label={selected.label} icon={selected.icon} disabled={!value.enabled} value={value[selected.key]} min={tab === 'beauty' || selected.key === 'sharpen' ? 0 : -100} suffix={tab === 'beauty' ? '%' : ''} onChange={(next) => onChange({ ...value, [selected.key]: next })} /></div>
       {selected.key === 'whiteBalance' && <p className="muted">Negative values cool the image; positive values add warmth.</p>}
       {tab === 'beauty' && ['loading', 'error', 'no-face'].includes(faceState) && <p className="muted" role="status">{

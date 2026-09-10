@@ -1,3 +1,4 @@
+import { SwipeSlider } from './SwipeSlider';
 import { GaugeSlider } from './GaugeSlider';
 import { useEffect, useState } from 'react';
 import { BackgroundSelection } from '../types/camera';
@@ -102,12 +103,12 @@ export function BackgroundPicker({ selected, onSelect, blur, tint, onBlur, onTin
       {selected.kind === 'color' && <label className={styles.colorRow}>Background color
           <input aria-label="Background color" type="color" value={color} onChange={(event) => { setColor(event.target.value); onSelect({ kind: 'color', value: event.target.value }); }} />
       </label>}
-        <div className={styles.options}>
+        <SwipeSlider label="Background presets" className={styles.options} selectedKey={selectedPreset}>
           {presets.map((preset, index) => <button key={preset.id} disabled={locked} onClick={() => editPreset(index)} aria-pressed={selected.kind === 'image' && selected.value === preset.src} aria-label={`${preset.name}: select and customize`}>
             <img src={preset.src} alt="" /><span>{preset.name}</span>
             {selected.kind === 'image' && selected.value === preset.src && <i className={styles.selectedBadge} aria-hidden="true"><Icon name="check" size={13} /></i>}
           </button>)}
-        </div>
+        </SwipeSlider>
       {typeof editor === 'number' && <div className={styles.editActions}>
         <label className={styles.upload} title="Replace preset image"><Icon name="upload" size={20} /><input aria-label="Replace preset image" disabled={locked} type="file" accept="image/png,image/jpeg,image/webp,image/avif" onChange={(event) => { void upload(event.target.files?.[0]); event.target.value = ''; }} /></label>
         {presets[editor].src !== BACKGROUNDS[editor].src && <button className="icon-button" aria-label={savedPresets[presets[editor].id] === presets[editor].src ? 'Preset saved on this device' : 'Save preset on this device'} title={savedPresets[presets[editor].id] === presets[editor].src ? 'Saved on this device' : 'Save preset on this device'} disabled={locked || savedPresets[presets[editor].id] === presets[editor].src} onClick={() => void persistPreset(editor)}><Icon name={savedPresets[presets[editor].id] === presets[editor].src ? 'check' : 'save'} /></button>}

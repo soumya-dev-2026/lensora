@@ -1,3 +1,4 @@
+import { SwipeSlider } from './SwipeSlider';
 import { useId, useState } from 'react';
 import { CameraEffects as EffectSettings, DEFAULT_EFFECTS } from '../types/effects';
 import type { FaceTrackingState } from '../types/filters';
@@ -16,10 +17,10 @@ function Choices<T extends string>({ label, value, options, onChange }: {
 }) {
   return <div className="effect-choice-group" role="group" aria-label={label}>
     <h3>{label}</h3>
-    <div className="effect-tiles">{options.map((option) => <button type="button" key={option.value} aria-pressed={value === option.value} onClick={() => onChange(option.value)}>
+    <SwipeSlider label={label} className="effect-tiles" selectedKey={value}>{options.map((option) => <button type="button" key={option.value} aria-pressed={value === option.value} onClick={() => onChange(option.value)}>
       <Icon name={option.icon} size={24} /><span>{option.label}</span>
       {value === option.value && <span className="selected-check"><Icon name="check" size={12} /></span>}
-    </button>)}</div>
+    </button>)}</SwipeSlider>
   </div>;
 }
 
@@ -70,7 +71,7 @@ export function CameraEffects({ value, onChange, faceState }: {
           {category === 'style' && <>
             <div className="effect-choice-group" role="group" aria-label="Color styles">
               <h3>Color styles</h3>
-              <div className="effect-tiles">
+              <SwipeSlider label="Color styles" className="effect-tiles">
                 {([
                   { key: 'monochrome', label: 'Black & white', icon: 'contrast' },
                   { key: 'sepia', label: 'Sepia', icon: 'sepia' },
@@ -78,7 +79,7 @@ export function CameraEffects({ value, onChange, faceState }: {
                   <Icon name={style.icon} size={24} /><span>{style.label}</span>
                   {value[style.key] && <span className="selected-check"><Icon name="check" size={12} /></span>}
                 </button>)}
-              </div>
+              </SwipeSlider>
             </div>
             <div className="effect-gauge-pair">
               {slider('vignette', 'Vignette', 'contrast')}

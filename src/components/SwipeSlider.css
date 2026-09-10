@@ -1,0 +1,13 @@
+.swipe-slider { position: relative; min-width: 0; max-width: 100%; margin-block: 12px; }
+.studio .swipe-slider .swipe-slider-track { position: relative; display: flex; flex-wrap: nowrap; gap: 10px; margin: 0; padding: 6px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; scroll-snap-type: x mandatory; scroll-padding-inline: 6px; overscroll-behavior-x: contain; touch-action: pan-x pan-y pinch-zoom; cursor: grab; }
+.swipe-slider-track::-webkit-scrollbar { display: none; }
+.studio .swipe-slider .swipe-slider-track > button { flex: 0 0 clamp(104px, 40%, 150px); min-width: 0; scroll-snap-align: start; white-space: normal; }
+.swipe-slider-track > button img { pointer-events: none; }
+.studio .swipe-slider .swipe-slider-track[data-dragging] { scroll-snap-type: none; cursor: grabbing; user-select: none; }
+.studio .swipe-slider .swipe-slider-track[data-dragging] > button { cursor: grabbing; }
+.studio .swipe-slider-arrow { position: absolute; top: calc(50% - 10px); transform: translateY(-50%); z-index: 1; width: 30px; height: 44px; min-height: 44px; padding: 0; display: grid; place-items: center; border: 1px solid #78f5e359; border-radius: 12px; background: #081c2be8; backdrop-filter: blur(14px); color: #a5fff1; box-shadow: 0 2px 12px #0006; }
+.studio .swipe-slider-arrow:disabled { opacity: 0; pointer-events: none; }
+.swipe-slider-prev { left: -4px; }
+.swipe-slider-next { right: -4px; }
+.swipe-slider-next svg { transform: rotate(180deg); }
+.swipe-slider-hint { display: block; margin-top: 5px; text-align: center; font-size: 10px; color: #91b9cf; pointer-events: none; }

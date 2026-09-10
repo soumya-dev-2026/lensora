@@ -111,6 +111,7 @@ test('closing save preserves the clip on cancel; delete clears it and restarts t
       const CameraPreview = () => null, BackgroundPicker = () => null, CameraFilters = () => null, CameraEffects = () => null;
       const Icon = () => null;
       const GaugeSlider = globalThis.GaugeSlider;
+      const SwipeSlider = ({ children }) => React.createElement('div', {}, children);
       const Modal = ({ title, children, onClose, open = true }) => open ? React.createElement('section', { title, onClose }, children) : null;
       const getMp4MimeType = () => 'video/mp4';
       class RecordingAudio { async unmute() { return true; } async resume() {} recordingTrack() { return { stop() {} }; } mute() {} dispose() {} }
@@ -165,6 +166,7 @@ test('effects panel updates independent settings, disables controls, and resets 
       const DEFAULT_EFFECTS = globalThis.effectDefaults;
       const Icon = () => null;
       const GaugeSlider = globalThis.GaugeSlider;
+      const SwipeSlider = ({ children }) => React.createElement('div', {}, children);
       const Modal = ({ children }) => React.createElement('section', {}, children);
       export function CameraEffects`));
   let settings = { ...DEFAULT_EFFECTS }, renderer;
