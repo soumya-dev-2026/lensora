@@ -7,11 +7,20 @@ import type { FaceFeatures } from '../types/filters';
 import { WebGLCompositor } from '../rendering/WebGLCompositor';
 import styles from './CameraPreview.module.css';
 
-export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMode, background, blur, tint, filters, onFaceTrackingState, onProcessingState }: CameraPreviewProps) {
+export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMode, background, blur, tint, filters, effects, comparing = false, onStartCamera, cameraStarting = false, cameraDisabled = false, onFaceTrackingState, onProcessingState }: CameraPreviewProps) {
+  const originalRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const original = originalRef.current;
+    if (!original || !comparing || !isActive) return;
+    // This is a display-only branch. The captured canvas remains processed.
+    original.srcObject = videoRef.current?.srcObject ?? null;
+    void original.play().catch(() => {});
+    return () => { original.srcObject = null; };
+  }, [comparing, isActive, facingMode, videoRef]);
   const compositorRef = useRef<WebGLCompositor | null>(null);
   const trackerRef = useRef<FaceTracker | null>(null);
-  const settings = useRef({ background, blur, tint, filters });
-  settings.current = { background, blur, tint, filters };
+  const settings = useRef({ background, blur, tint, filters, effects });
+  settings.current = { background, blur, tint, filters, effects };
   const [generation, setGeneration] = useState(0);
   const [backgroundError, setBackgroundError] = useState<string>();
 
@@ -108,7 +117,7 @@ export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMod
                     onFaceTrackingState('error');
                   }
                 }
-                compositor!.render(segmentationInput.frame, mask.data, mask.width, mask.height, facingMode === 'user', effect.background.kind === 'blur', effect.blur, effect.tint, effect.filters, mask.regions, face);
+                compositor!.render(segmentationInput.frame, mask.data, mask.width, mask.height, facingMode === 'user', effect.background.kind === 'blur', effect.blur, effect.tint, effect.filters, mask.regions, face, effect.effects, time / 1000);
                 if (!ready) { ready = true; onProcessingState?.('ready'); }
               }
             }
@@ -129,10 +138,16 @@ export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMod
     };
   }, [isActive, facingMode, onProcessingState, onFaceTrackingState, videoRef, canvasRef]);
 
-  return <div className={`${styles.container} ${styles[layout]}`}>
+  return <div className={`${styles.container} ${styles[layout]}${!isActive ? ` ${styles.idle}` : ''}`}>
     <video ref={videoRef} className={styles.sourceVideo} autoPlay playsInline muted />
     <canvas ref={canvasRef} className={styles.canvas} width={layout === 'portrait' ? 720 : 1280} height={layout === 'landscape' ? 720 : 1280} />
-    {!isActive && <div className={styles.overlay}><span>Your space. Your scene.</span><small>Start your camera to preview a background</small></div>}
+    {isActive && comparing && <><video ref={originalRef} className={styles.originalPreview} style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : undefined }} autoPlay playsInline muted /><span className={styles.originalLabel}>Original preview</span></>}
+    {!isActive && <div className={styles.overlay}>
+      <button type="button" data-camera-start className={styles.cameraOrb} aria-label="Start camera preview" disabled={cameraDisabled || cameraStarting} onClick={onStartCamera}><svg aria-hidden="true" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="m8 5 2-2h4l2 2h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" /><circle cx="12" cy="13" r="4" /></svg></button>
+      <span className={styles.startLabel}>{cameraStarting ? 'Starting camera…' : 'Start camera'}</span>
+      <h1>Your space. <span>Your scene.</span></h1>
+      <p>Start your camera to preview a background</p>
+    </div>}
     {backgroundError && <p className={styles.error} role="alert">{backgroundError}</p>}
   </div>;
 }

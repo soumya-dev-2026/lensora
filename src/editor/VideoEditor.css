@@ -25,7 +25,7 @@
 .editor-playback .icon-button { width: 36px; height: 36px; background: transparent; }
 .editor-timeline { background: #ffffff04; border: 1px solid #ffffff10; border-radius: 12px; padding: 18px; }
 .editor-timeline > input { width: 100%; accent-color: #b3ecde; }
-.editor-timeline > div:first-of-type { display: flex; justify-content: space-between; font-size: 10px; color: #98abb4; margin-top: 12px; font-variant-numeric: tabular-nums; }
+.editor-timeline > .timeline-labels { display: flex; justify-content: space-between; font-size: 10px; color: #98abb4; margin-top: 12px; font-variant-numeric: tabular-nums; }
 .audio-timeline-row { display: flex; align-items: center; gap: 9px; margin-top: 12px; background: #b3ecde12; padding: 10px; border-radius: 5px; color: #b3ecde; }
 .audio-timeline-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; flex: 1; }
 .audio-timeline-row small { font-size: 10px; }

@@ -1,0 +1,46 @@
+<!doctype html>
+<!-- Run npm run dev, then open /tests/effects-browser.html for real WebGL pixel checks. -->
+<html lang="en"><meta charset="utf-8"><title>Effects GPU checks</title>
+<style>body{background:#111a22;color:#eef;font:14px system-ui}main{display:flex;flex-wrap:wrap;gap:12px}canvas{width:180px;height:320px}figure{margin:0}pre{white-space:pre-wrap}</style>
+<h1>Effects GPU checks</h1><pre id="result">Running…</pre><main></main>
+<script type="module">
+import { WebGLCompositor } from '/src/rendering/WebGLCompositor.ts';
+import { DEFAULT_EFFECTS } from '/src/types/effects.ts';
+const result = document.querySelector('#result');
+try {
+  const source = document.createElement('canvas'); source.width = 360; source.height = 640;
+  const ctx = source.getContext('2d');
+  const gradient = ctx.createLinearGradient(0, 0, 360, 640); gradient.addColorStop(0, '#eb945b'); gradient.addColorStop(1, '#356fc7'); ctx.fillStyle=gradient;ctx.fillRect(0,0,360,640);
+  ctx.fillStyle='#f4c5a3';ctx.beginPath();ctx.ellipse(180,280,65,95,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#172e44';ctx.fillRect(144,255,15,10);ctx.fillRect(201,255,15,10);ctx.fillRect(165,310,30,8);
+  const mask = new Uint8Array(360*640);
+  for(let y=0;y<640;y++)for(let x=0;x<360;x++)mask[y*360+x]=((x-180)/95)**2+((y-360)/190)**2<1?255:0;
+  const faceMask=document.createElement('canvas'); faceMask.width=1;faceMask.height=1;
+  const face={eyes:[],mask:faceMask,pose:{center:[0.5,280/640],radius:[65/360,95/640],roll:0.15}};
+  const canvas=document.createElement('canvas');canvas.width=360;canvas.height=640;
+  const compositor=new WebGLCompositor(canvas);compositor.setBackgroundColor('#18374d');
+  const gl=canvas.getContext('webgl2');
+  const render=(settings={},time=1,tracked=face,mirror=false)=>{
+    compositor.render(source,mask,360,640,mirror,false,0,0,undefined,undefined,tracked,{...DEFAULT_EFFECTS,...settings},time);
+    const pixels=new Uint8Array(360*640*4);gl.readPixels(0,0,360,640,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+    if(gl.getError()!==gl.NO_ERROR)throw Error('WebGL render error');return pixels;
+  };
+  const baseline=render();
+  const differs=(a,b)=>a.some((v,i)=>v!==b[i]);
+  const checks=[];
+  const check=(name,ok)=>{if(!ok)throw Error(name);checks.push('PASS '+name)};
+  const cases=[['Wavy border',{wavyBorder:true}],['Crown',{sticker:'crown'}],['Heart',{sticker:'heart'}],['Star',{sticker:'star'}],['Neon frame',{frame:'neon'}],['Film frame',{frame:'film'}],['White frame',{frame:'white'}],['Bubbles',{background:'bubbles'}],['Rain',{background:'rain'}],['Spotlight',{spotlight:80}],['Distortion',{distortion:90}],['Black & white',{monochrome:true}],['Sepia',{sepia:true}],['Film grain',{grain:75}],['Glitch',{glitch:90}]];
+  for(const [name,settings] of cases){
+    const pixels=render(settings);check(name+' changes output',differs(baseline,pixels));
+    const figure=document.createElement('figure'), image=document.createElement('canvas'), caption=document.createElement('figcaption');image.width=360;image.height=640;image.getContext('2d').drawImage(canvas,0,0);caption.textContent=name;figure.append(image,caption);document.querySelector('main').append(figure);
+  }
+  for(const settings of [{background:'bubbles'},{background:'rain'},{wavyBorder:true},{grain:60},{glitch:90}])check(JSON.stringify(settings)+' animates',differs(render(settings,1),render(settings,2)));
+  const bw=render({monochrome:true});check('Black & white has equal RGB channels',bw.every((v,i)=>i%4>1||Math.abs(v-bw[i-i%4+2])<=1));
+  for(const background of ['rain','bubbles']){const weather=render({background});let protectedPixels=true;for(let y=250;y<350;y++)for(let x=155;x<205;x++){const index=((639-y)*360+x)*4;for(let c=0;c<3;c++)if(weather[index+c]!==baseline[index+c])protectedPixels=false;}check(background+' stays behind person',protectedPixels);}
+  const faceEffects={wavyBorder:true,sticker:'crown',distortion:100};check('Tracking loss hides face effects',!differs(render({},1,null),render(faceEffects,1,null)));
+  check('Head movement changes sticker position',differs(render({sticker:'heart'}),render({sticker:'heart'},1,{...face,pose:{...face.pose,center:[0.6,0.5],roll:-0.3}})));
+  check('Master switch bypasses every effect',!differs(baseline,render({wavyBorder:true,sticker:'crown',frame:'film',background:'rain',spotlight:100,distortion:100,monochrome:true,sepia:true,grain:100,glitch:100,enabled:false})));
+  for(const [w,h] of [[640,360],[480,480]]){canvas.width=w;canvas.height=h;compositor.render(source,mask,360,640,true,false,0,0,undefined,undefined,face,{...DEFAULT_EFFECTS,sticker:'star',wavyBorder:true,background:'bubbles'},2);check(w+'x'+h+' mirrored render',gl.getError()===gl.NO_ERROR);}
+  compositor.dispose();result.textContent=checks.join('\n')+'\nALL CHECKS PASSED';
+}catch(error){result.textContent='FAIL: '+error.stack;}
+</script></html>

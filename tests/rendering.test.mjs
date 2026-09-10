@@ -292,3 +292,39 @@ test('captured camera canvas preserves source aspect and texture dimensions', ()
   assert.deepEqual(uniforms.get('u_backgroundTexel'), [1 / 1280, 1 / 720]);
   assert.ok(calls.some(([name, ...args]) => name === 'texImage2D' && args.at(-1) === captured));
 });
+
+const { DEFAULT_EFFECTS } = await loadModule('../src/types/effects.ts');
+test('effects bypass resets all styling without affecting filters; tracking loss clears face pose', () => {
+  const { compositor, uniforms } = fixture();
+  const effects = { ...DEFAULT_EFFECTS, wavyBorder: true, sticker: 'crown', frame: 'film', background: 'rain', spotlight: 80, distortion: 90, monochrome: true, sepia: true, grain: 40, glitch: 60 };
+  const face = { eyes: [], mask: {}, pose: { center: [0.4, 0.5], radius: [0.1, 0.2], roll: 0.3 } };
+  const render = (settings, tracked = face) => compositor.render({ width: 1280, height: 720 }, new Uint8Array([255]), 1, 1, true, false, 0, 0, { ...DEFAULT_FILTERS, brightness: 30 }, undefined, tracked, settings, 12);
+  render(effects);
+  assert.deepEqual(uniforms.get('u_pose'), [0.4, 0.5, 0.1, 0.2]);
+  assert.deepEqual(uniforms.get('u_roll'), [0.3]);
+  assert.deepEqual(uniforms.get('u_distortion'), [0.9]);
+  assert.deepEqual(uniforms.get('u_weather'), [2]);
+  render({ ...effects, enabled: false });
+  for (const key of ['wave','sticker','frame','weather','spotlight','distortion','monochrome','sepia','grain','glitch']) assert.deepEqual(uniforms.get(`u_${key}`), [0], key);
+  assert.deepEqual(uniforms.get('u_brightness'), [0.3]);
+  render(effects, null);
+  assert.deepEqual(uniforms.get('u_pose'), [0, 0, 0, 0]);
+  assert.deepEqual(uniforms.get('u_distortion'), [0]);
+  assert.deepEqual(uniforms.get('u_weather'), [2]);
+  compositor.dispose();
+});
+
+test('new looks and effects have neutral defaults, independent strength, and complete bypass', () => {
+  const { compositor, uniforms } = fixture();
+  const render = (filters, effects) => compositor.render({ width: 1280, height: 720 }, new Uint8Array([255]), 1, 1, true, false, 0, 0, filters, undefined, null, effects, 1);
+  render(DEFAULT_FILTERS, DEFAULT_EFFECTS);
+  for (const key of ['look', 'sharpen', 'vignette', 'outline']) assert.deepEqual(uniforms.get(`u_${key}`), [0]);
+  const filters = { ...DEFAULT_FILTERS, look: 'cinematic', lookIntensity: 60, sharpen: 40 };
+  const effects = { ...DEFAULT_EFFECTS, vignette: 30, outline: 80, outlineWidth: 7, outlineColor: '#ff0080' };
+  render(filters, effects);
+  for (const [key, value] of Object.entries({ look: 2, lookIntensity: .6, sharpen: .4, vignette: .3, outline: .8, outlineWidth: 7 })) assert.deepEqual(uniforms.get(`u_${key}`), [value]);
+  assert.deepEqual(uniforms.get('u_outlineColor'), [1, 0, 128 / 255, 1]);
+  render({ ...filters, enabled: false }, { ...effects, enabled: false });
+  for (const key of ['look', 'lookIntensity', 'sharpen', 'vignette', 'outline']) assert.deepEqual(uniforms.get(`u_${key}`), [0]);
+  compositor.dispose();
+});

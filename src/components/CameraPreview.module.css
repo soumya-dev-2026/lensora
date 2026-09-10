@@ -4,7 +4,23 @@
 .square { width: min(100vw, 100dvh); height: min(100dvh, 100vw); }
 .sourceVideo { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .canvas { width: 100%; height: 100%; display: block; }
-.overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; color: #fff; background: radial-gradient(ellipse at 50% 60%, #30464b 0, #182328 40%, #10151c 80%); text-align: center; padding: 20px; }
-.overlay span { font-size: clamp(22px, 4vw, 48px); letter-spacing: -.04em; font-weight: 500; }
-.overlay small { color: #a5b4b9; font-size: 14px; }
+.idle { width: 100%; height: 100%; background: transparent; }
+.idle .canvas { visibility: hidden; }
+.overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; color: #f6f8ff; text-align: center; padding: 110px 24px 170px; }
+.overlay h1 { font-size: clamp(24px, 3.8vw, 42px); letter-spacing: -.045em; font-weight: 650; line-height: 1.2; }
+.overlay h1 span { color: #70eaff; background: linear-gradient(110deg, #70fff0, #55c9ff 55%, #a366ff); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.overlay p { max-width: 380px; color: #aebbd1; font-size: clamp(12px, 1.7vw, 18px); line-height: 1.5; }
+/* A fine illuminated rim surrounds the dark glass camera emblem. */
+.cameraOrb { position: relative; isolation: isolate; display: grid; place-items: center; flex: none; width: clamp(108px, 15vw, 160px); aspect-ratio: 1; margin-bottom: 22px; border-radius: 50%; color: #eaffff; background: radial-gradient(ellipse at 18% 15%, #087b8273, transparent 62%), linear-gradient(145deg, #071d29ed, #060c1cf5 68%, #191442eb); box-shadow: inset 3px 3px 15px #58fff52b, inset -2px -3px 12px #6555ff24, -4px -3px 24px #00e4db26, 4px 6px 22px #4b32fd20; }
+.cameraOrb::before { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; pointer-events: none; background: conic-gradient(from 0deg, #3bfff2, #1599bf 22%, #3434d9 40%, #8064ff 54%, #087fcb 69%, #03e6de 83%, #3bfff2); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); mask-composite: exclude; animation: camera-glow-orbit 6s linear infinite; }
+.cameraOrb::after { content: ''; position: absolute; inset: -6px; z-index: -1; border-radius: inherit; pointer-events: none; background: conic-gradient(from 30deg, #21ffe54d, #05587908 35%, #7850ff66 60%, #00d8e652); filter: blur(14px); opacity: .4; animation: camera-glow-pulse 3s ease-in-out infinite; }
+.cameraOrb svg { position: relative; width: 34%; height: 34%; filter: drop-shadow(0 0 4px #bcffff55); }
+@keyframes camera-glow-orbit { to { transform: rotate(360deg); } }
+@keyframes camera-glow-pulse { 0%, 100% { opacity: .3; transform: scale(.96); } 50% { opacity: .65; transform: scale(1.08); } }
+@media (prefers-reduced-motion: reduce) { .cameraOrb::before, .cameraOrb::after { animation: none; } }
+@media (max-height: 500px) { .overlay { padding-block: 95px 115px; gap: 8px; } .cameraOrb { width: 68px; margin-bottom: 2px; } .overlay h1 { font-size: 24px; } .overlay p { font-size: 12px; } }
 .error { position: absolute; bottom: 150px; left: 10%; right: 10%; padding: 12px; background: #552828; color: white; border-radius: 10px; }
+.startLabel { color: #a5fff0; font-size: 13px; margin-top: -18px; }
+.overlay button.cameraOrb { border: 0; padding: 0; background: radial-gradient(ellipse at 18% 15%, #087b8273, transparent 62%), linear-gradient(145deg, #071d29ed, #060c1cf5 68%, #191442eb); }
+.originalPreview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.originalLabel { position: absolute; bottom: 170px; left: 50%; transform: translateX(-50%); color: white; padding: 7px 12px; border-radius: 20px; background: #061b2ee6; font-size: 12px; white-space: nowrap; }

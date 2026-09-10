@@ -1,6 +1,24 @@
 import type { ReactNode } from 'react';
 
 const shapes = {
+  bookmark: <path d="M6 3h12a1 1 0 0 1 1 1v18l-7-5-7 5V4a1 1 0 0 1 1-1Z" />,
+  timer: <><circle cx="12" cy="14" r="8" /><path d="M12 10v5l2 2M9 2h6M12 2v4M18 6l2-2" /></>,
+  motion: <><path d="M9 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9M8 5v3M8 16v3M2 8h3M1 12h9M2 16h3" /></>,
+  settings: <><path d="m9 3 1-2h4l1 2 2 1 2-.2 2 3.4-1 1.8v2l1 1.8-2 3.4-2-.2-2 1-1 2h-4l-1-2-2-1-2 .2-2-3.4 1-1.8v-2L3 7.2 5 3.8 7 4Z" transform="translate(0 2)" /><circle cx="12" cy="12" r="3" /></>,
+  wand: <><path d="m5 18 10-10 3 3L8 21H5ZM13 10l3 3M5 6h4M7 4v4M11 3h.01" /><circle cx="18" cy="6" r="2.5" /></>,
+  none: <><circle cx="12" cy="12" r="9" /><path d="m6 6 12 12" /></>,
+  crown: <path d="m3 6 4 5 5-7 5 7 4-5-2 13H5ZM5 16h14" />,
+  heart: <path d="M20 5c-3-3-7-1-8 1-1-2-5-4-8-1-4 4 1 9 8 15 7-6 12-11 8-15Z" />,
+  star: <path d="m12 2 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1Z" />,
+  wave: <><path d="M2 8q3-8 6 0t6 0 6 0M2 16q3-8 6 0t6 0 6 0" /></>,
+  bubbles: <><circle cx="8" cy="14" r="6" /><circle cx="17" cy="6" r="4" /><circle cx="19" cy="18" r="2" /><path d="M5 12q1-2 3-2M15 5h1" /></>,
+  rain: <><path d="M6 12a4 4 0 1 1 1-8 5 5 0 0 1 9 1 3.5 3.5 0 1 1 2 7ZM7 16l-2 4m8-4-2 4m8-4-2 4" /></>,
+  spotlight: <><path d="m9 3 6 0 2 5H7ZM8 11l-5 9m13-9 5 9M12 12v5" /><ellipse cx="12" cy="20" rx="9" ry="2" /></>,
+  distortion: <><path d="M6 3q6-3 12 0l2 7-4 10-8 1-4-9ZM8 8h1m6 1h1M8 15q4 5 8 0" /></>,
+  film: <><rect x="3" y="2" width="18" height="20" rx="2" /><path d="M7 2v20M17 2v20M3 7h4m-4 5h4m-4 5h4M17 7h4m-4 5h4m-4 5h4" /></>,
+  sepia: <><path d="M20 3C8 2 2 8 5 16c7 7 16-1 15-13ZM4 21 16 8M8 16v-5m0 5h5" /></>,
+  grain: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M7 7h.01M12 6h.01M17 8h.01M6 12h.01M11 11h.01M16 13h.01M8 17h.01M13 16h.01M18 18h.01" strokeWidth="2.5" /></>,
+  glitch: <path d="M3 4h15v4H8v4h13v4H6v4h15M3 8h2M3 16h1M20 4h1" />,
   volume: <><path d="m11 4-6 5H2v6h3l6 5ZM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" /></>,
   volumeOff: <><path d="m11 4-6 5H2v6h3l6 5ZM16 9l6 6m0-6-6 6" /></>,
   edit: <><path d="m4 16-1 5 5-1L21 7l-4-4ZM14 6l4 4M3 3h7M3 7h4" /></>,
@@ -17,6 +35,7 @@ const shapes = {
   save: <><path d="M4 3h13l4 4v14H3V3ZM7 3v6h10V3M7 21v-8h10v8" /></>,
   check: <path d="m5 12 4 4L19 6" />,
   image: <><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8" cy="8" r="1" /><path d="m21 15-5-5L5 21M3 16l4-4 4 4" /></>,
+  effects: <><path d="m3 18 11-11 4 4L7 22ZM12 9l4 4M5 2v6M2 5h6M19 1v4m-2-2h4M20 18v4m-2-2h4" /></>,
   sparkle: <><path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z" /><path d="M20 2v4m-2-2h4" /></>,
   sliders: <><path d="M4 7h8m4 0h4M4 17h3m4 0h9" /><circle cx="14" cy="7" r="2" /><circle cx="9" cy="17" r="2" /></>,
   sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" /></>,
@@ -44,6 +63,7 @@ const shapes = {
   reset: <><path d="M3 10a9 9 0 1 1 2 8M3 4v6h6" /></>,
   upload: <><path d="M12 16V3m-5 5 5-5 5 5M4 16v5h16v-5" /></>,
   download: <><path d="M12 3v13m-5-5 5 5 5-5M4 16v5h16v-5" /></>,
+  minus: <path d="M5 12h14" />,
   plus: <path d="M12 5v14M5 12h14" />,
 } satisfies Record<string, ReactNode>;
 

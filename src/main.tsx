@@ -3,6 +3,9 @@ import ReactDOM from 'react-dom/client';
 const App = lazy(() => import('./App'));
 const VideoEditor = lazy(() => import('./editor/VideoEditor'));
 import './index.css';
+import { readPreference } from './storage/uiPreferences';
+
+document.documentElement.dataset.motion = readPreference('animations') ? 'on' : 'off';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

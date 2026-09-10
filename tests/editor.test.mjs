@@ -170,13 +170,16 @@ test('editor controls forward uploaded media, trim/crop, mix and overlays to MP4
   };
   globalThis.editorModel = model;
   globalThis.Image = class { naturalWidth = 100; naturalHeight = 100; async decode() {} };
+  globalThis.GaugeSlider = (await load('../src/components/GaugeSlider.tsx', (source) =>
+    `const React = globalThis.React; const { useId, useRef, useState } = React; const Icon = () => null; const MotionToggle = () => null;\n` + source.replace(/^import .*;$/gm, ''))).GaugeSlider;
   const { default: Editor } = await load('../src/editor/VideoEditor.tsx', (source) => source
     .replace(/^import .*;$/gm, '')
     .replace('function Tool(', `const React = globalThis.React;
       const { useEffect, useRef, useState } = React;
       const { clamp, defaultSettings } = globalThis.editorModel;
       const EditorEngine = globalThis.EditorUiEngine;
-      const Icon = () => null;
+      const Icon = () => null; const MotionToggle = () => null;
+      const GaugeSlider = globalThis.GaugeSlider;
       const Modal = ({ children }) => React.createElement('section', {}, children);
       function Tool(`));
   let renderer;

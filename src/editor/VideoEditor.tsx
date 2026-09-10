@@ -1,10 +1,13 @@
+import { GaugeSlider } from '../components/GaugeSlider';
 import { useEffect, useRef, useState } from 'react';
 import { Icon, type IconName } from '../components/Icon';
 import { Modal } from '../components/Modal';
+import { MotionToggle } from '../components/MotionToggle';
 import { EditorEngine } from './EditorEngine';
 import { clamp, defaultSettings, type AudioLayer, type EditSettings, type Overlay } from './model';
 import '../App.css';
 import './VideoEditor.css';
+import '../glass-theme.css';
 
 type Panel = 'trim' | 'crop' | 'audio' | 'text' | 'frame';
 const timeLabel = (seconds: number) => `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toFixed(1).padStart(4, '0')}`;
@@ -13,7 +16,7 @@ function Tool({ icon, label, active, disabled, onClick }: { icon: IconName; labe
   return <button className="icon-button" title={label} aria-label={label} aria-pressed={active} disabled={disabled} onClick={onClick}><Icon name={icon} /></button>;
 }
 function Slider({ label, value, min = 0, max = 100, step = 1, suffix = '%', onChange }: { label: string; value: number; min?: number; max?: number; step?: number; suffix?: string; onChange: (value: number) => void }) {
-  return <label className="editor-slider"><span>{label}<output>{Number(value.toFixed(2))}{suffix}</output></span><input aria-label={label} type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} /></label>;
+  return <div className="editor-slider"><GaugeSlider label={label} value={value} min={min} max={max} step={step} suffix={suffix} onChange={onChange} /></div>;
 }
 
 export default function VideoEditor() {
@@ -189,8 +192,8 @@ export default function VideoEditor() {
           <Tool icon={settings.muted ? 'volumeOff' : 'volume'} label={settings.muted ? 'Unmute video audio' : 'Mute video audio'} active={!settings.muted} disabled={!info || locked} onClick={() => update({ muted: !settings.muted })} />
         </div>
         <div className="editor-timeline">
-          <input aria-label="Video playhead" type="range" min={settings.start} max={settings.end || 1} step={.01} value={clamp(time, settings.start, settings.end || 1)} disabled={!info || locked} onChange={(event) => void engine.current?.seek(Number(event.target.value)).catch((error) => setError(errorText(error)))} />
-          <div><span>{timeLabel(settings.start)}</span><span>{timeLabel(settings.end - settings.start)} selected</span><span>{timeLabel(settings.end)}</span></div>
+          <GaugeSlider label="Video playhead" icon="play" min={settings.start} max={settings.end || 1} step={.01} suffix="s" value={clamp(time, settings.start, settings.end || 1)} disabled={!info || locked} onChange={(next) => void engine.current?.seek(next).catch((error) => setError(errorText(error)))} />
+          <div className="timeline-labels"><span>{timeLabel(settings.start)}</span><span>{timeLabel(settings.end - settings.start)} selected</span><span>{timeLabel(settings.end)}</span></div>
           {layers.map((layer) => <div className="audio-timeline-row" key={layer.id}><Icon name="audio" size={13} /><span>{layer.name}</span><small>{layer.volume}% · starts {timeLabel(layer.start)}</small></div>)}
         </div>
         {loading && <p className="editor-notice" role="status">Preparing media…</p>}
@@ -206,6 +209,7 @@ export default function VideoEditor() {
           {panel === 'frame' && <><h2>Video frame</h2><p>A finishing border, included in your export.</p><div className="frame-options">{(['none', 'border', 'cinema', 'polaroid'] as const).map((frame) => <button key={frame} aria-pressed={settings.frame === frame} onClick={() => update({ frame, frameColor: frame === 'cinema' ? '#000000' : settings.frameColor })}><span className={`frame-swatch ${frame}`} /><span>{frame}</span></button>)}</div>{settings.frame !== 'none' && <><Slider label="Frame thickness" value={settings.frameWidth} min={1} max={15} onChange={(frameWidth) => update({ frameWidth })} /><label className="editor-color">Frame color<input aria-label="Frame color" type="color" value={settings.frameColor} onChange={(event) => update({ frameColor: event.target.value })} /></label></>}</>}
         </fieldset>
         <p className="editor-footnote">MP4 · up to 1920px longest edge · 30 fps<br />Your originals stay unchanged.</p>
+        <MotionToggle />
       </aside>
     </div>
     {saveOpen && result && <Modal title="Your edit is ready" onClose={() => setSaveOpen(false)}><video className="recorded-preview" src={result} controls playsInline /><label className="filename">File name<input value={name} maxLength={120} onChange={(event) => setName(event.target.value)} /></label><div className="dialog-actions"><button className="icon-button primary" aria-label="Save edited MP4" title="Save edited MP4" onClick={download}><Icon name="download" /></button></div></Modal>}

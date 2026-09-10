@@ -1,3 +1,4 @@
+import type { CameraEffects } from '../types/effects';
 import type { CameraFilters, FaceFeatures } from '../types/filters';
 
 const VERTEX_SHADER = `#version 300 es
@@ -9,7 +10,7 @@ void main() {
 }`;
 
 const FRAGMENT_SHADER = `#version 300 es
-precision mediump float;
+precision highp float;
 uniform sampler2D u_camera;
 uniform sampler2D u_mask;
 uniform sampler2D u_background;
@@ -27,6 +28,28 @@ uniform float u_skinSmoothing;
 uniform float u_eyeSize;
 uniform float u_redLips;
 uniform float u_darkHair;
+uniform float u_sharpen;
+uniform float u_look;
+uniform float u_lookIntensity;
+uniform float u_vignette;
+uniform float u_outline;
+uniform float u_outlineWidth;
+uniform vec4 u_outlineColor;
+uniform vec4 u_pose;
+uniform float u_time;
+uniform float u_sourceAspect;
+uniform float u_outputAspect;
+uniform float u_roll;
+uniform float u_weather;
+uniform float u_wave;
+uniform float u_sticker;
+uniform float u_frame;
+uniform float u_spotlight;
+uniform float u_distortion;
+uniform float u_monochrome;
+uniform float u_sepia;
+uniform float u_grain;
+uniform float u_glitch;
 uniform bool u_mirror;
 uniform vec2 u_cameraScale;
 uniform vec2 u_backgroundScale;
@@ -57,6 +80,11 @@ vec2 enlargeEye(vec2 uv, vec4 eye) {
 
 vec3 beautify(vec2 uv) {
   vec3 color = texture(u_camera, uv).rgb;
+  if (u_sharpen > 0.0) {
+    vec3 neighbors = (texture(u_camera, uv + vec2(u_cameraTexel.x, 0.0)).rgb + texture(u_camera, uv - vec2(u_cameraTexel.x, 0.0)).rgb
+      + texture(u_camera, uv + vec2(0.0, u_cameraTexel.y)).rgb + texture(u_camera, uv - vec2(0.0, u_cameraTexel.y)).rgb) * 0.25;
+    color = clamp(color + clamp(color - neighbors, -0.12, 0.12) * u_sharpen * 2.0, 0.0, 1.0);
+  }
   vec2 regions = texture(u_regions, uv).rg;
   vec3 face = texture(u_faceMask, uv).rgb;
   float skin = smoothstep(0.2, 0.85, regions.r);
@@ -136,16 +164,170 @@ vec3 blurredBackground(vec2 uv) {
   return color / total;
 }
 
+float hash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 4375.5453);
+}
+
+// Coordinates in face-height units, with head roll removed.
+vec2 faceLocal(vec2 uv) {
+  vec2 p = (uv - u_pose.xy) * vec2(u_sourceAspect, 1.0);
+  float c = cos(u_roll), s = sin(u_roll);
+  return vec2(c * p.x + s * p.y, -s * p.x + c * p.y);
+}
+
+vec3 animateBackground(vec3 color, vec2 uv) {
+  vec2 p = uv * vec2(u_outputAspect, 1.0);
+  if (u_weather == 1.0) {
+    for (int i = 0; i < 18; i++) {
+      float seed = float(i);
+      float h = hash(vec2(seed, 4.0));
+      float r = 0.018 + h * 0.047;
+      vec2 center = vec2(hash(vec2(seed, 8.0)) * u_outputAspect + sin(u_time * 0.5 + seed) * 0.035,
+        1.15 - mod(hash(vec2(seed, 9.0)) * 1.3 + u_time * (0.035 + h * 0.035), 1.3));
+      vec2 q = (p - center) / r;
+      float d = length(q);
+      if (d < 1.08) {
+        float rim = exp(-pow((d - 0.94) * 23.0, 2.0));
+        float shine = exp(-dot(q - vec2(-0.35, -0.48), q - vec2(-0.35, -0.48)) * 65.0);
+        vec3 iridescence = 0.55 + 0.45 * cos(vec3(0.0, 2.1, 4.2) + atan(q.y, q.x) * 2.0 + u_time * 0.4);
+        color = mix(color, color * 0.92 + iridescence * 0.18, (1.0 - smoothstep(0.85, 1.0, d)) * 0.3);
+        color += rim * iridescence * 0.38 + shine * 0.7;
+      }
+    }
+  } else if (u_weather == 2.0) {
+    for (int layer = 0; layer < 3; layer++) {
+      float depth = float(layer);
+      vec2 rain = vec2(p.x + p.y * 0.13, p.y) * vec2(65.0 + depth * 25.0, 8.0 + depth * 4.0);
+      rain.y -= u_time * (7.0 + depth * 3.0);
+      vec2 cell = floor(rain), q = fract(rain);
+      float seed = hash(cell);
+      float streak = (1.0 - smoothstep(0.015, 0.07, abs(q.x - (0.2 + seed * 0.6)))) * smoothstep(0.0, 0.9, q.y);
+      color += vec3(0.6, 0.78, 0.95) * streak * step(0.55, seed) * (0.16 + depth * 0.08);
+    }
+  }
+  return color;
+}
+
+vec3 faceDecoration(vec3 color, vec2 uv) {
+  if (u_pose.z <= 0.0) return color;
+  vec2 local = faceLocal(uv);
+  vec2 radius = vec2(u_pose.z * u_sourceAspect, u_pose.w);
+  vec2 q = local / radius;
+  if (u_wave > 0.0) {
+    float angle = atan(q.y, q.x);
+    float edge = abs(length(q) - 1.13 - sin(angle * 12.0 + u_time * 3.0) * 0.055);
+    vec3 neon = 0.55 + 0.45 * cos(vec3(0.0, 2.0, 4.0) + angle + u_time);
+    color += neon * exp(-edge * 35.0) * 0.5;
+    color = mix(color, neon, 1.0 - smoothstep(0.014, 0.035, edge));
+  }
+  if (u_sticker > 0.0) {
+    vec2 s = (local - vec2(0.0, -radius.y * 1.35)) / (radius.x * 0.65);
+    float shape = 0.0;
+    vec3 ink = vec3(1.0, 0.78, 0.16);
+    if (u_sticker == 1.0) {
+      float top = -0.48 + 0.4 * abs(sin((s.x + 0.8) * 5.89));
+      shape = (1.0 - smoothstep(0.78, 0.82, abs(s.x))) * smoothstep(top - 0.025, top, s.y) * (1.0 - smoothstep(0.35, 0.39, s.y));
+      ink += vec3(0.0, 0.12, 0.25) * (1.0 - smoothstep(0.0, 0.12, abs(s.y - 0.2)));
+    } else if (u_sticker == 2.0) {
+      vec2 h = s * 1.35; h.y = -h.y + 0.15;
+      float base = h.x * h.x + h.y * h.y - 0.65;
+      float heart = base * base * base - h.x * h.x * h.y * h.y * h.y;
+      shape = 1.0 - smoothstep(-0.025, 0.025, heart);
+      ink = vec3(1.0, 0.18, 0.4);
+    } else {
+      float angle = mod(atan(s.x, -s.y) + 6.283185, 6.283185);
+      float sector = floor(angle / 0.6283185);
+      float localAngle = angle - sector * 0.6283185;
+      float outer = mod(sector, 2.0) < 1.0 ? 0.8 : 0.35;
+      float inner = mod(sector, 2.0) < 1.0 ? 0.35 : 0.8;
+      float boundary = outer * inner * sin(0.6283185) / (inner * sin(0.6283185 - localAngle) + outer * sin(localAngle));
+      shape = 1.0 - smoothstep(boundary - 0.02, boundary + 0.02, length(s));
+    }
+    color = mix(color, ink * (0.9 + 0.1 * clamp(-s.y, 0.0, 1.0)), shape);
+  }
+  return color;
+}
+
+vec3 finishEffects(vec3 color, vec2 uv, vec2 cameraUv) {
+  if (u_spotlight > 0.0) {
+    vec2 center = vec2(0.5, 0.42);
+    if (u_pose.z > 0.0) {
+      center = u_pose.xy;
+      if (u_mirror) center.x = 1.0 - center.x;
+      center = (center - 0.5) / u_cameraScale + 0.5;
+    }
+    float distance = length((uv - center) * vec2(u_outputAspect, 1.0));
+    color *= 1.0 - smoothstep(0.16, 0.6, distance) * u_spotlight * 0.88;
+    color += vec3(1.0, 0.91, 0.7) * exp(-distance * distance * 28.0) * u_spotlight * 0.09;
+  }
+  color = faceDecoration(color, cameraUv);
+  if (u_frame > 0.0) {
+    vec2 edge = min(uv, 1.0 - uv) * vec2(u_outputAspect, 1.0);
+    float d = min(edge.x, edge.y);
+    if (u_frame == 1.0) {
+      vec3 neon = 0.55 + 0.45 * cos(vec3(0.0, 2.0, 4.0) + u_time * 0.7 + uv.y * 3.0);
+      color += neon * exp(-abs(d - 0.025) * 100.0) * 0.5;
+      color = mix(color, neon, 1.0 - smoothstep(0.003, 0.006, abs(d - 0.025)));
+    } else if (u_frame == 2.0) {
+      float strip = 1.0 - smoothstep(0.036, 0.039, edge.x);
+      color = mix(color, vec3(0.025), strip);
+      float hole = step(0.009, edge.x) * (1.0 - step(0.027, edge.x)) * step(0.2, fract(uv.y * 22.0)) * (1.0 - step(0.72, fract(uv.y * 22.0)));
+      color = mix(color, vec3(0.85), hole);
+    } else color = mix(color, vec3(0.96, 0.95, 0.91), 1.0 - smoothstep(0.023, 0.025, d));
+  }
+  if (u_look > 0.0 && u_lookIntensity > 0.0) {
+    float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+    vec3 graded = color;
+    if (u_look < 1.5) graded = (mix(vec3(luma), color, 1.08) - 0.5) * 1.04 + 0.51;
+    else if (u_look < 2.5) graded = (mix(vec3(luma), color, 0.85) - 0.5) * 1.12 + 0.5 + mix(vec3(-0.025, 0.025, 0.045), vec3(0.04, 0.015, -0.02), smoothstep(0.2, 0.8, luma));
+    else if (u_look < 3.5) graded = color * vec3(1.10, 1.02, 0.91);
+    else if (u_look < 4.5) graded = color * vec3(0.92, 1.02, 1.10);
+    else graded = mix(vec3(luma), color, 0.72) * vec3(0.94, 0.88, 0.76) + vec3(0.065, 0.045, 0.035);
+    color = mix(color, clamp(graded, 0.0, 1.0), u_lookIntensity);
+  }
+  color *= 1.0 - smoothstep(0.25, 1.0, length((uv - 0.5) * 1.414214)) * u_vignette * 0.85;
+  if (u_monochrome > 0.0) color = vec3(dot(color, vec3(0.2126, 0.7152, 0.0722)));
+  if (u_sepia > 0.0) color = vec3(dot(color, vec3(0.393, 0.769, 0.189)), dot(color, vec3(0.349, 0.686, 0.168)), dot(color, vec3(0.272, 0.534, 0.131)));
+  if (u_grain > 0.0) color += (hash(gl_FragCoord.xy + mod(floor(u_time * 24.0), 1000.0)) - 0.5) * u_grain * 0.24;
+  if (u_glitch > 0.0) {
+    float pulse = step(0.75, hash(vec2(floor(u_time * 9.0), 3.0)));
+    color = mix(color, color.gbr, pulse * u_glitch * 0.45);
+    color *= 1.0 - u_glitch * 0.13 * step(0.5, fract(gl_FragCoord.y / 3.0));
+  }
+  return clamp(color, 0.0, 1.0);
+}
+
 void main() {
-  vec2 cameraUv = (v_uv - 0.5) * u_cameraScale + 0.5;
+  vec2 screenUv = v_uv;
+  if (u_glitch > 0.0) {
+    float slice = hash(vec2(floor(v_uv.y * 22.0), floor(u_time * 12.0)));
+    screenUv.x = clamp(screenUv.x + (slice - 0.5) * 0.12 * u_glitch * step(0.82, slice), 0.0, 1.0);
+  }
+  vec2 cameraUv = (screenUv - 0.5) * u_cameraScale + 0.5;
   if (u_mirror) cameraUv.x = 1.0 - cameraUv.x;
-  vec2 beautyUv = enlargeEye(enlargeEye(cameraUv, u_eye0), u_eye1);
+  vec2 effectUv = cameraUv;
+  if (u_distortion > 0.0 && u_pose.z > 0.0) {
+    vec2 q = faceLocal(cameraUv) / vec2(u_pose.z * u_sourceAspect, u_pose.w);
+    float falloff = 1.0 - smoothstep(0.0, 1.0, length(q));
+    effectUv = u_pose.xy + (cameraUv - u_pose.xy) * (1.0 - u_distortion * falloff * 0.65);
+  }
+  vec2 beautyUv = enlargeEye(enlargeEye(effectUv, u_eye0), u_eye1);
   vec3 foreground = beautify(beautyUv);
   vec2 backgroundUv = u_liveBackground ? cameraUv : (v_uv - 0.5) * u_backgroundScale + 0.5;
-  vec3 background = blurredBackground(backgroundUv) * (1.0 - u_tint);
+  vec3 background = animateBackground(blurredBackground(backgroundUv) * (1.0 - u_tint), screenUv);
   // Eye enlargement must not move the person's silhouette or glasses coverage.
   float alpha = max(personMask(cameraUv), texture(u_faceMask, cameraUv).b);
-  outColor = vec4(mix(background, foreground, alpha), 1.0);
+  if (u_outline > 0.0) {
+    vec2 radius = u_cameraScale * vec2(1.0 / u_outputAspect, 1.0) * u_outlineWidth / 720.0;
+    float expanded = alpha;
+    for (int i = 0; i < 8; i++) {
+      float angle = float(i) * 0.785398;
+      vec2 sampleUv = cameraUv + vec2(cos(angle), sin(angle)) * radius;
+      expanded = max(expanded, smoothstep(0.12, 0.88, texture(u_mask, sampleUv).r));
+    }
+    background = mix(background, u_outlineColor.rgb, max(expanded - alpha, 0.0) * u_outline);
+  }
+  outColor = vec4(finishEffects(mix(background, foreground, alpha), v_uv, cameraUv), 1.0);
 }`;
 
 function compile(gl: WebGL2RenderingContext, type: number, source: string) {
@@ -213,6 +395,8 @@ export class WebGLCompositor {
     this.filterLocations = new Map([
       'brightness', 'whiteBalance', 'saturation', 'contrast', 'skinBrightening',
       'skinSmoothing', 'eyeSize', 'redLips', 'darkHair', 'cameraTexel', 'eye0', 'eye1',
+      'sharpen', 'look', 'lookIntensity', 'vignette', 'outline', 'outlineWidth', 'outlineColor',
+      'pose', 'time', 'sourceAspect', 'outputAspect', 'roll', 'weather', 'wave', 'sticker', 'frame', 'spotlight', 'distortion', 'monochrome', 'sepia', 'grain', 'glitch',
     ].map((key) => [key, gl.getUniformLocation(program, `u_${key}`)]));
     this.cameraScaleLocation = gl.getUniformLocation(program, 'u_cameraScale');
     this.backgroundScaleLocation = gl.getUniformLocation(program, 'u_backgroundScale');
@@ -293,15 +477,41 @@ export class WebGLCompositor {
     gl.deleteProgram(this.program);
   }
 
-  render(video: HTMLVideoElement | HTMLCanvasElement, mask: Uint8Array, maskWidth: number, maskHeight: number, mirror: boolean, liveBackground = false, blur = 0, tint = 0, filters?: CameraFilters, regions?: Uint8Array, face?: FaceFeatures | null): void {
+  render(video: HTMLVideoElement | HTMLCanvasElement, mask: Uint8Array, maskWidth: number, maskHeight: number, mirror: boolean, liveBackground = false, blur = 0, tint = 0, filters?: CameraFilters, regions?: Uint8Array, face?: FaceFeatures | null, effects?: CameraEffects, time = 0): void {
     const sourceWidth = 'videoWidth' in video ? video.videoWidth : video.width;
     const sourceHeight = 'videoHeight' in video ? video.videoHeight : video.height;
     const { gl } = this;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.useProgram(this.program);
-    for (const key of ['brightness', 'whiteBalance', 'saturation', 'contrast', 'skinBrightening', 'skinSmoothing', 'eyeSize', 'redLips', 'darkHair'] as const) {
+    const enabled = effects?.enabled;
+    const pose = face?.pose;
+    gl.uniform4f(this.filterLocations.get('pose')!, pose?.center[0] ?? 0, pose?.center[1] ?? 0, pose?.radius[0] ?? 0, pose?.radius[1] ?? 0);
+    const effectValues = {
+      time: time % 3600, sourceAspect: sourceWidth / sourceHeight, outputAspect: this.canvas.width / this.canvas.height,
+      roll: pose?.roll ?? 0,
+      look: filters?.enabled ? Math.max(0, ['none', 'natural', 'cinematic', 'warm', 'cool', 'vintage'].indexOf(filters.look ?? 'none')) : 0,
+      lookIntensity: filters?.enabled ? (filters.lookIntensity ?? 100) / 100 : 0,
+      vignette: enabled ? (effects.vignette ?? 0) / 100 : 0,
+      outline: enabled ? (effects.outline ?? 0) / 100 : 0,
+      outlineWidth: effects?.outlineWidth ?? 4,
+      weather: enabled ? ['none', 'bubbles', 'rain'].indexOf(effects.background) : 0,
+      wave: enabled && effects.wavyBorder ? 1 : 0,
+      sticker: enabled ? ['none', 'crown', 'heart', 'star'].indexOf(effects.sticker) : 0,
+      frame: enabled ? ['none', 'neon', 'film', 'white'].indexOf(effects.frame) : 0,
+      spotlight: enabled ? effects.spotlight / 100 : 0,
+      distortion: enabled && pose ? effects.distortion / 100 : 0,
+      monochrome: enabled && effects.monochrome ? 1 : 0,
+      sepia: enabled && effects.sepia ? 1 : 0,
+      grain: enabled ? effects.grain / 100 : 0,
+      glitch: enabled ? effects.glitch / 100 : 0,
+    };
+    const outlineHex = /^#[\da-f]{6}$/i.test(effects?.outlineColor ?? '') ? effects!.outlineColor : '#78f5e3';
+    const outlineRgb = [1, 3, 5].map((offset) => parseInt(outlineHex.slice(offset, offset + 2), 16) / 255);
+    gl.uniform4f(this.filterLocations.get('outlineColor')!, outlineRgb[0], outlineRgb[1], outlineRgb[2], 1);
+    for (const [key, value] of Object.entries(effectValues)) gl.uniform1f(this.filterLocations.get(key)!, value);
+    for (const key of ['brightness', 'whiteBalance', 'saturation', 'contrast', 'skinBrightening', 'skinSmoothing', 'eyeSize', 'redLips', 'darkHair', 'sharpen'] as const) {
       const needsFace = key === 'eyeSize' || key === 'redLips';
-      gl.uniform1f(this.filterLocations.get(key)!, filters?.enabled && (!needsFace || face) ? filters[key] / 100 : 0);
+      gl.uniform1f(this.filterLocations.get(key)!, filters?.enabled && (!needsFace || face) ? (filters[key] ?? 0) / 100 : 0);
     }
     gl.uniform2f(this.filterLocations.get('cameraTexel')!, 1 / sourceWidth, 1 / sourceHeight);
     for (let i = 0; i < 2; i++) {

@@ -1,7 +1,7 @@
+import { GaugeSlider } from './GaugeSlider';
 import { useEffect, useState } from 'react';
 import { BackgroundSelection } from '../types/camera';
 import { loadBackgroundPresets, saveBackgroundPreset } from '../storage/backgroundPresets';
-import { Modal } from './Modal';
 import { Icon } from './Icon';
 import styles from './BackgroundPicker.module.css';
 
@@ -25,8 +25,8 @@ export function BackgroundPicker({ selected, onSelect, blur, tint, onBlur, onTin
   const [savedPresets, setSavedPresets] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [storing, setStoring] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [editor, setEditor] = useState<number | 'blur' | null>(null);
+  const selectedPreset = presets.findIndex((preset) => selected.kind === 'image' && selected.value === preset.src);
+  const editor = selectedPreset >= 0 ? selectedPreset : 'blur';
   const [uploadError, setUploadError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [color, setColor] = useState('#3856d6');
@@ -64,7 +64,6 @@ export function BackgroundPicker({ selected, onSelect, blur, tint, onBlur, onTin
   const editPreset = (index: number) => {
     onSelect({ kind: 'image', value: presets[index].src });
     setUploadError('');
-    setEditor(index);
   };
   const upload = async (file?: File) => {
     if (!file || typeof editor !== 'number') return;
@@ -92,22 +91,13 @@ export function BackgroundPicker({ selected, onSelect, blur, tint, onBlur, onTin
     finally { URL.revokeObjectURL(url); setUploading(false); }
   };
   const sliders = <div className="sliders">
-    <label htmlFor="blur">Background blur <output aria-hidden="true">{blur}%</output></label>
-    <input id="blur" type="range" min="0" max="100" value={blur} onChange={(event) => onBlur(Number(event.target.value))} />
-    <label htmlFor="tint">Darken background <output aria-hidden="true">{tint}%</output></label>
-    <input id="tint" type="range" min="0" max="100" value={tint} onChange={(event) => onTint(Number(event.target.value))} />
+    <GaugeSlider id="blur" label="Background blur" icon="blur" value={blur} preview={selected.kind === 'image' ? { src: selected.value, filter: `blur(${blur / 10}px)` } : undefined} onChange={onBlur} />
+    <GaugeSlider id="tint" label="Darken background" icon="contrast" value={tint} preview={selected.kind === 'image' ? { src: selected.value, filter: `brightness(${1 - tint / 100})` } : undefined} onChange={onTint} />
   </div>;
   return <>
-    <button className="icon-button glass" aria-label="Background filters" title="Background filters" aria-haspopup="dialog" onClick={() => {
-      setOpen(true);
-      setUploadError('');
-      const index = presets.findIndex((preset) => selected.kind === 'image' && selected.value === preset.src);
-      setEditor(index >= 0 ? index : 'blur');
-    }}><Icon name="image" /></button>
-    {open && <Modal title="Background" onClose={() => { if (!locked) setOpen(false); }}>
       <div className={styles.modes} role="group" aria-label="Background type">
-        <button disabled={locked} aria-pressed={selected.kind === 'blur'} onClick={() => { onSelect({ kind: 'blur', value: '' }); if (selected.kind !== 'blur' && blur === 0) onBlur(35); setEditor('blur'); }}><Icon name="blur" />Blur</button>
-        <button disabled={locked} aria-pressed={selected.kind === 'color'} onClick={() => { onSelect({ kind: 'color', value: color }); setEditor('blur'); }}><Icon name="palette" />Color</button>
+        <button disabled={locked} aria-pressed={selected.kind === 'blur'} onClick={() => { onSelect({ kind: 'blur', value: '' }); if (selected.kind !== 'blur' && blur === 0) onBlur(35); }}><Icon name="blur" />Blur</button>
+        <button disabled={locked} aria-pressed={selected.kind === 'color'} onClick={() => { onSelect({ kind: 'color', value: color }); }}><Icon name="palette" />Color</button>
       </div>
       {selected.kind === 'color' && <label className={styles.colorRow}>Background color
           <input aria-label="Background color" type="color" value={color} onChange={(event) => { setColor(event.target.value); onSelect({ kind: 'color', value: event.target.value }); }} />
@@ -115,6 +105,7 @@ export function BackgroundPicker({ selected, onSelect, blur, tint, onBlur, onTin
         <div className={styles.options}>
           {presets.map((preset, index) => <button key={preset.id} disabled={locked} onClick={() => editPreset(index)} aria-pressed={selected.kind === 'image' && selected.value === preset.src} aria-label={`${preset.name}: select and customize`}>
             <img src={preset.src} alt="" /><span>{preset.name}</span>
+            {selected.kind === 'image' && selected.value === preset.src && <i className={styles.selectedBadge} aria-hidden="true"><Icon name="check" size={13} /></i>}
           </button>)}
         </div>
       {typeof editor === 'number' && <div className={styles.editActions}>
@@ -127,6 +118,5 @@ export function BackgroundPicker({ selected, onSelect, blur, tint, onBlur, onTin
       {storing && <p role="status">Saving preset…</p>}
       {uploading && <p role="status">Preparing image…</p>}
       {uploadError && <p role="alert">{uploadError}</p>}
-    </Modal>}
   </>;
 }

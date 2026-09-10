@@ -102,11 +102,16 @@ test('closing save preserves the clip on cancel; delete clears it and restarts t
     .replace('function App()', `const React = globalThis.React;
       const { useCallback, useEffect, useRef, useState } = React;
       const { useCamera } = globalThis.studioFixture;
+      const readPreference = (key, fallback = true) => key === 'countdown' ? false : fallback;
+      const writePreference = () => {};
+      const MicrophoneMeter = () => null, CompareButton = () => null, SavedLooks = () => null, MotionToggle = () => null, RecordingCountdown = () => null;
       const BACKGROUNDS = [{ src: 'studio.svg' }];
       const DEFAULT_FILTERS = {};
-      const CameraPreview = () => null, BackgroundPicker = () => null, CameraFilters = () => null;
+      const DEFAULT_EFFECTS = {};
+      const CameraPreview = () => null, BackgroundPicker = () => null, CameraFilters = () => null, CameraEffects = () => null;
       const Icon = () => null;
-      const Modal = ({ title, children, onClose }) => React.createElement('section', { title, onClose }, children);
+      const GaugeSlider = globalThis.GaugeSlider;
+      const Modal = ({ title, children, onClose, open = true }) => open ? React.createElement('section', { title, onClose }, children) : null;
       const getMp4MimeType = () => 'video/mp4';
       class RecordingAudio { async unmute() { return true; } async resume() {} recordingTrack() { return { stop() {} }; } mute() {} dispose() {} }
       function App()`));
@@ -116,6 +121,13 @@ test('closing save preserves the clip on cancel; delete clears it and restarts t
   preview.props.canvasRef.current = { captureStream: () => ({ addTrack() {}, getTracks: () => [] }) };
   await act(async () => preview.props.onProcessingState('ready'));
   const button = (label) => renderer.root.findByProps({ 'aria-label': label });
+  for (const [label, tab] of [['Background filters', 'background'], ['Camera filters', 'filters'], ['Camera effects', 'effects']]) {
+    await act(async () => button(label).props.onClick());
+    assert.equal(renderer.root.findAllByType('section').filter((node) => node.props.title === 'Studio settings').length, 1);
+    assert.equal(renderer.root.findByProps({ id: `studio-tab-${tab}` }).props['aria-selected'], true);
+    assert.equal(renderer.root.findByProps({ id: `studio-panel-${tab}` }).props.hidden, false);
+    await act(async () => renderer.root.findAllByType('section').find((node) => node.props.title === 'Studio settings').props.onClose());
+  }
   assert.ok(button('Mute microphone')); // Camera starts with microphone enabled.
   await act(async () => button('Mute microphone').props.onClick());
   assert.ok(button('Unmute microphone'));
@@ -138,4 +150,71 @@ test('closing save preserves the clip on cancel; delete clears it and restarts t
   assert.equal(renderer.root.findAllByType('section').length, 0);
   assert.ok(button('Start recording'));
   await act(async () => renderer.unmount());
+});
+
+test('effects panel updates independent settings, disables controls, and resets defaults', async () => {
+  globalThis.React = React;
+  const { DEFAULT_EFFECTS } = await load('../src/types/effects.ts');
+  globalThis.effectDefaults = DEFAULT_EFFECTS;
+  globalThis.GaugeSlider = (await load('../src/components/GaugeSlider.tsx', (source) =>
+    `const React = globalThis.React; const { useId, useRef, useState } = React; const Icon = () => null;\n` + source.replace(/^import .*;$/gm, ''))).GaugeSlider;
+  const { CameraEffects } = await load('../src/components/CameraEffects.tsx', (source) => source
+    .replace(/^import .*;$/gm, '')
+    .replace('export function CameraEffects', `const React = globalThis.React;
+      const { useId, useState } = React;
+      const DEFAULT_EFFECTS = globalThis.effectDefaults;
+      const Icon = () => null;
+      const GaugeSlider = globalThis.GaugeSlider;
+      const Modal = ({ children }) => React.createElement('section', {}, children);
+      export function CameraEffects`));
+  let settings = { ...DEFAULT_EFFECTS }, renderer;
+  const onChange = (value) => { settings = value; renderer.update(React.createElement(CameraEffects, { value, onChange, faceState: 'no-face' })); };
+  await act(async () => { renderer = TestRenderer.create(React.createElement(CameraEffects, { value: settings, onChange, faceState: 'no-face' })); });
+  const click = (label) => act(async () => renderer.root.findAllByType('button').find((button) => button.findAllByType('span').some((span) => span.children.join('') === label)).props.onClick());
+  assert.equal(renderer.root.findAllByType('select').length, 0);
+  await click('Crown'); await click('Scene'); await click('Neon'); await click('Rain');
+  await click('Face');
+  assert.equal(settings.sticker, 'crown'); assert.equal(settings.frame, 'neon'); assert.equal(settings.background, 'rain');
+  assert.ok(renderer.root.findByProps({ role: 'status' }).children.join('').includes('Face the camera'));
+  await act(async () => renderer.root.findAllByType('input').find((input) => input.props.id === 'effect-distortion').props.onChange({ target: { value: '70' } }));
+  assert.equal(settings.distortion, 70);
+  await act(async () => renderer.root.findByProps({ role: 'switch' }).props.onChange({ target: { checked: false } }));
+  assert.equal(renderer.root.findByType('fieldset').props.disabled, true);
+  assert.equal(settings.sticker, 'crown');
+  await act(async () => renderer.root.findByProps({ 'aria-label': 'Reset all effects' }).props.onClick());
+  assert.deepEqual(settings, DEFAULT_EFFECTS);
+  await act(async () => renderer.unmount());
+});
+
+test('noise cancellation defaults on, toggles the existing mic, and preserves recording audio', async () => {
+  const { nodes, output } = audioFixture();
+  const mic = track();
+  let capture, suppressed = true;
+  const updates = [];
+  mic.getConstraints = () => ({ echoCancellation: true });
+  mic.getSettings = () => ({ noiseSuppression: suppressed });
+  mic.applyConstraints = async (constraints) => { updates.push(constraints); suppressed = constraints.noiseSuppression.ideal; };
+  navigator.mediaDevices.getUserMedia = async (constraints) => { capture = constraints; return { getAudioTracks: () => [mic], getTracks: () => [mic] }; };
+  const { RecordingAudio } = await load('../src/recording/RecordingAudio.ts');
+  const audio = new RecordingAudio();
+  const recording = audio.recordingTrack();
+  assert.equal(await audio.unmute(), true);
+  assert.equal(capture.audio.noiseSuppression.ideal, true);
+  assert.equal(await audio.setNoiseCancellation(false), true);
+  assert.equal(suppressed, false);
+  assert.equal(updates.at(-1).echoCancellation, true);
+  await Promise.all([audio.setNoiseCancellation(true), audio.setNoiseCancellation(false)]);
+  assert.equal(suppressed, false);
+  assert.equal(nodes.length, 1);
+  assert.equal(nodes[0].connected, true);
+  assert.equal(recording.stopped, false);
+  assert.equal(output.stopped, false);
+  mic.applyConstraints = async () => { throw new Error('unsupported'); };
+  assert.equal(await audio.setNoiseCancellation(true), false);
+  assert.equal(mic.stopped, false);
+  audio.dispose();
+  const restored = new RecordingAudio(false);
+  assert.equal(await restored.unmute(), true);
+  assert.equal(capture.audio.noiseSuppression.ideal, false);
+  restored.dispose();
 });

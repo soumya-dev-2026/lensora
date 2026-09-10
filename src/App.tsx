@@ -9,15 +9,55 @@ import { getMp4MimeType } from './recording/mp4';
 import { CameraFilters } from './components/CameraFilters';
 import { DEFAULT_FILTERS, FaceTrackingState } from './types/filters';
 import { Icon } from './components/Icon';
+import { CameraEffects } from './components/CameraEffects';
+import { DEFAULT_EFFECTS } from './types/effects';
+import { RecordingCountdown } from './components/RecordingCountdown';
+import { MicrophoneMeter } from './components/MicrophoneMeter';
+import { CompareButton } from './components/CompareButton';
+import { SavedLooks } from './components/SavedLooks';
+import { MotionToggle } from './components/MotionToggle';
+import { readPreference, writePreference } from './storage/uiPreferences';
 import './App.css';
+import './glass-theme.css';
 
-type RecordingState = 'idle' | 'starting' | 'recording' | 'paused' | 'stopping';
+const settingsTabs = [
+  { key: 'background', label: 'Background', icon: 'image' },
+  { key: 'filters', label: 'Filters', icon: 'sparkle' },
+  { key: 'effects', label: 'Effects', icon: 'effects' },
+] as const;
+type SettingsTab = typeof settingsTabs[number]['key'];
+
+type RecordingState = 'idle' | 'starting' | 'countdown' | 'recording' | 'paused' | 'stopping';
 const formatTime = (ms: number) => {
   const seconds = Math.floor(ms / 1000);
   return `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
 };
 
 function App() {
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('background');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsExpanded, setSettingsExpanded] = useState(() => readPreference('expanded-settings', false));
+  const [noiseCancellation, setNoiseCancellation] = useState(() => readPreference('noise-cancellation'));
+  const [noisePending, setNoisePending] = useState(false);
+  const [noiseNotice, setNoiseNotice] = useState('');
+  const [countdownEnabled, setCountdownEnabled] = useState(() => readPreference('countdown'));
+  const [comparing, setComparing] = useState(false);
+  const [cameraStarting, setCameraStarting] = useState(false);
+  const startingCamera = useRef(false);
+  const settingsTabsRef = useRef<HTMLDivElement>(null);
+  const settingsDrag = useRef<{ pointerId: number; x: number; scrollLeft: number; moved: boolean } | null>(null);
+  useEffect(() => {
+    const tabbar = settingsTabsRef.current;
+    if (!settingsOpen || !tabbar) return;
+    tabbar.closest('.sidebar-content')?.scrollTo({ top: 0 });
+    const selected = tabbar.querySelector<HTMLButtonElement>('[aria-selected="true"]');
+    if (selected) tabbar.scrollTo({
+      left: selected.offsetLeft - (tabbar.clientWidth - selected.offsetWidth) / 2,
+      behavior: document.documentElement.dataset.motion === 'off' || window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+    });
+  }, [settingsTab, settingsOpen]);
+  const openSettings = (tab: SettingsTab) => { setSettingsTab(tab); setSettingsOpen(true); };
+  const [effects, setEffects] = useState({ ...DEFAULT_EFFECTS });
   const [filters, setFilters] = useState({ ...DEFAULT_FILTERS });
   const [faceState, setFaceState] = useState<FaceTrackingState>('off');
   const [layout, setLayout] = useState<CanvasLayout>('portrait');
@@ -36,7 +76,7 @@ function App() {
   const [micMuted, setMicMuted] = useState(false);
   const [micPending, setMicPending] = useState(false);
   const micReady = useRef(false);
-  const audioRef = useRef(new RecordingAudio());
+  const audioRef = useRef(new RecordingAudio(noiseCancellation));
   const [clipUrl, setClipUrl] = useState('');
   const [elapsed, setElapsed] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
@@ -44,9 +84,14 @@ function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const pendingStart = useRef(false);
+  const recordingRequest = useRef(false);
+  const requestId = useRef(0);
+  const [startRequest, setStartRequest] = useState(0);
   const accumulated = useRef(0);
   const startedAt = useRef(0);
   const { videoRef, isActive, facingMode, error, startCamera, stopCamera, switchCamera, isSupported, hasMultipleCameras } = useCamera();
+  const cameraActive = useRef(isActive);
+  cameraActive.current = isActive;
   const busy = recordingState !== 'idle';
   const showTimer = recordingState === 'recording' || recordingState === 'paused' || recordingState === 'stopping';
 
@@ -54,6 +99,24 @@ function App() {
     setProcessing(state);
     setProcessingError(message);
   }, []);
+  const startPreview = async () => {
+    if (startingCamera.current || busy || !isSupported) return;
+    startingCamera.current = true; setCameraStarting(true);
+    try { await startCamera(); }
+    finally { startingCamera.current = false; setCameraStarting(false); }
+  };
+  const cancelRecordingStart = useCallback(() => {
+    requestId.current++; recordingRequest.current = false; pendingStart.current = false;
+    setRecordingState((current) => current === 'starting' || current === 'countdown' ? 'idle' : current);
+  }, []);
+  useEffect(() => {
+    const cancel = () => { if (document.visibilityState === 'hidden') cancelRecordingStart(); };
+    document.addEventListener('visibilitychange', cancel);
+    return () => document.removeEventListener('visibilitychange', cancel);
+  }, [cancelRecordingStart]);
+  useEffect(() => {
+    if (recordingState === 'countdown' && (!isActive || processing !== 'ready')) cancelRecordingStart();
+  }, [recordingState, isActive, processing, cancelRecordingStart]);
 
   useEffect(() => {
     if (!savedClip) { setClipUrl(''); return; }
@@ -90,6 +153,7 @@ function App() {
   }, [isActive]);
 
   useEffect(() => () => {
+    requestId.current++; recordingRequest.current = false; pendingStart.current = false;
     audioRef.current.dispose();
     const recorder = recorderRef.current;
     if (recorder) {
@@ -102,6 +166,9 @@ function App() {
   }, []);
 
   const beginRecording = useCallback(() => {
+    if (!recordingRequest.current || recorderRef.current) return;
+    recordingRequest.current = false;
+    if (document.visibilityState === 'hidden' || !cameraActive.current) { setRecordingState('idle'); return; }
     let stream: MediaStream | undefined;
     try {
       const canvas = canvasRef.current;
@@ -138,32 +205,42 @@ function App() {
     }
   }, []);
 
+  const queueRecording = useCallback(() => {
+    if (!recordingRequest.current) return;
+    if (document.visibilityState === 'hidden') { cancelRecordingStart(); return; }
+    setComparing(false); setSettingsOpen(false);
+    if (countdownEnabled) setRecordingState('countdown');
+    else beginRecording();
+  }, [countdownEnabled, beginRecording, cancelRecordingStart]);
+
   useEffect(() => {
     if (pendingStart.current && isActive && processing === 'ready' && micReady.current) {
       pendingStart.current = false;
-      beginRecording();
+      queueRecording();
     }
     if (error || processing === 'error') {
-      pendingStart.current = false;
-      setRecordingState((current) => current === 'starting' ? 'idle' : current);
+      cancelRecordingStart();
       const recorder = recorderRef.current;
       if (recorder && recorder.state !== 'inactive') {
         setRecordingError('Camera processing stopped. Save the video captured so far.');
         recorder.stop();
       }
     }
-  }, [isActive, processing, error, beginRecording, micPending]);
+  }, [isActive, processing, error, queueRecording, micPending, startRequest, cancelRecordingStart]);
 
   const record = async () => {
+    if (recordingRequest.current || busy || startingCamera.current) return;
     if (savedClip) { setSaveOpen(true); return; }
+    const attempt = ++requestId.current;
+    recordingRequest.current = true;
     setRecordingError(null);
     setRecordingState('starting');
     try { await audioRef.current.resume(); }
-    catch { setRecordingError('Audio recording is unavailable in this browser.'); setRecordingState('idle'); return; }
-    if (isActive && processing === 'ready' && micReady.current) { beginRecording(); return; }
+    catch { if (attempt === requestId.current) { cancelRecordingStart(); setRecordingError('Audio recording is unavailable in this browser.'); } return; }
+    if (attempt !== requestId.current || !recordingRequest.current) return;
     pendingStart.current = true;
-    setRecordingState('starting');
-    if (!isActive) await startCamera();
+    setStartRequest(attempt);
+    if (!cameraActive.current) await startCamera();
   };
   const pauseOrResume = () => {
     const recorder = recorderRef.current;
@@ -224,44 +301,131 @@ function App() {
   };
   const message = error || processingError || recordingError;
 
-  return <div className="studio" ref={studioRef}>
+  return <div className="studio" data-camera-active={isActive} ref={studioRef}>
     <main className="stage" aria-label="Camera studio">
-      <CameraPreview layout={layout} videoRef={videoRef} canvasRef={canvasRef} isActive={isActive} facingMode={facingMode} background={background} blur={blur} tint={tint} filters={filters} onFaceTrackingState={setFaceState} onProcessingState={handleProcessingState} />
+      <CameraPreview layout={layout} videoRef={videoRef} canvasRef={canvasRef} isActive={isActive} facingMode={facingMode} background={background} blur={blur} tint={tint} filters={filters} effects={effects} comparing={comparing} onStartCamera={() => void startPreview()} cameraStarting={cameraStarting} cameraDisabled={!isSupported || busy} onFaceTrackingState={setFaceState} onProcessingState={handleProcessingState} />
     </main>
+    {recordingState === 'countdown' && <RecordingCountdown onComplete={beginRecording} onCancel={cancelRecordingStart} />}
+    {isActive && processing === 'ready' && recordingState !== 'countdown' && recordingState !== 'starting' && <CompareButton onChange={setComparing} />}
     {showTimer && <div className={`recording-time ${recordingState === 'recording' ? 'live' : ''}`} role="timer" aria-label={`${recordingState === 'paused' ? 'Paused' : 'Recording time'} ${formatTime(elapsed)}`}>
       {recordingState === 'paused' ? <Icon name="pause" size={12} /> : <i aria-hidden="true" />}{formatTime(elapsed)}
     </div>}
     <div className="top-left">
-      <BackgroundPicker selected={background} onSelect={setBackground} blur={blur} tint={tint} onBlur={setBlur} onTint={setTint} />
-      <a className="icon-button glass" href="/editor" aria-disabled={busy} onClick={(event) => { if (busy) event.preventDefault(); }} aria-label="Open video editor" title="Video editor"><Icon name="edit" /></a>
-      <CameraFilters value={filters} onChange={setFilters} faceState={faceState} />
+      <button className="icon-button glass" data-current={settingsTab === 'background'} aria-label="Background filters" title="Background" aria-haspopup="dialog" onClick={() => openSettings('background')}><Icon name="image" /></button>
+      <button className="icon-button glass" data-current={settingsTab === 'filters'} aria-label="Camera filters" title="Camera filters" aria-haspopup="dialog" onClick={() => openSettings('filters')}><Icon name="sparkle" /></button>
+      <button className="icon-button glass" data-current={settingsTab === 'effects'} aria-label="Camera effects" title="Camera effects" aria-haspopup="dialog" onClick={() => openSettings('effects')}><Icon name="sliders" /></button>
     </div>
     <div className="top-right">
       <button className="icon-button glass" aria-label="Canvas orientation" title="Canvas orientation" aria-haspopup="dialog" disabled={busy} onClick={() => setLayoutOpen(true)}><Icon name={layout} /></button>
       <button className="icon-button glass" aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} title={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} onClick={() => void toggleFullscreen()}><Icon name={fullscreen ? 'collapse' : 'expand'} /></button>
+      {hasMultipleCameras && <button className="icon-button glass camera-switch" aria-label="Switch camera" title="Switch camera" disabled={!isActive || busy} onClick={() => void switchCamera()}><Icon name="switchCamera" /></button>}
     </div>
     <div className="status-area" aria-live="polite">
       {!isSupported && <p role="alert">Camera access is unavailable. Open this app over HTTPS in a camera-capable browser.</p>}
       {message && <p role="alert">{message}</p>}
       {processing === 'loading' && <p>Preparing your camera and background…</p>}
+      {recordingState === 'starting' && <button type="button" onClick={cancelRecordingStart}>Cancel recording start</button>}
       {isActive && processing === 'error' && !busy && <button className="icon-button glass" aria-label="Reset camera" title="Reset camera" onClick={stopCamera}><Icon name="reset" /></button>}
       {savedClip && !saveOpen && !discardOpen && <div className="clip-actions"><button className="icon-button glass" aria-label="Review and save video" title="Review and save video" onClick={() => setSaveOpen(true)}><Icon name="download" /></button><button className="icon-button glass" aria-label="New recording" title="New recording" onClick={requestDiscard}><Icon name="plus" /></button></div>}
     </div>
-    <button className="icon-button glass microphone-toggle" aria-label={micMuted ? 'Unmute microphone' : 'Mute microphone'} title={micMuted ? 'Unmute microphone' : 'Mute microphone'} aria-pressed={!micMuted} disabled={!isActive || micPending || recordingState === 'stopping'} onClick={() => void toggleMicrophone()}><Icon name={micMuted ? 'micOff' : 'mic'} /></button>
+    <a className="icon-button glass studio-editor-launcher" href="/editor" aria-disabled={busy} onClick={(event) => { if (busy) event.preventDefault(); }} aria-label="Open video editor" title="Video editor"><Icon name="wand" /></a>
     <div className="record-controls">
-      <button className="icon-button glass camera-toggle" aria-label={isActive ? 'Camera off' : 'Start camera'} title={isActive ? 'Camera off' : 'Start camera'} disabled={!isSupported || busy} onClick={() => isActive ? stopCamera() : void startCamera()}><Icon name={isActive ? 'cameraOff' : 'camera'} /></button>
+      <button className="icon-button glass camera-toggle" aria-label={isActive ? 'Camera off' : 'Start camera'} title={isActive ? 'Camera off' : 'Start camera'} disabled={!isSupported || busy || cameraStarting} onClick={() => isActive ? stopCamera() : void startPreview()}><Icon name={isActive ? 'cameraOff' : 'camera'} /></button>
       {recordingState === 'recording' || recordingState === 'paused' ? <>
         <button className="record-small pause" aria-label={recordingState === 'paused' ? 'Resume recording' : 'Pause recording'} title={recordingState === 'paused' ? 'Resume recording' : 'Pause recording'} onClick={pauseOrResume}><Icon name={recordingState === 'paused' ? 'play' : 'pause'} /></button>
         <button className="record-small stop" aria-label="Stop recording" title="Stop recording" onClick={stop}><Icon name="stop" /></button>
       </> : <>
-        <button className="record-button" aria-label={savedClip ? 'Review recording' : 'Start recording'} title={savedClip ? 'Review recording' : 'Start recording'} disabled={!isSupported || busy || (isActive && processing === 'error')} onClick={() => void record()}>{savedClip ? <Icon name="play" size={26} /> : <span />}</button>
+        <button className="record-button" aria-label={savedClip ? 'Review recording' : 'Start recording'} title={savedClip ? 'Review recording' : 'Start recording'} disabled={!isSupported || busy || cameraStarting || (isActive && processing === 'error')} onClick={() => void record()}>{savedClip ? <Icon name="play" size={26} /> : <span />}</button>
       </>}
-      {hasMultipleCameras && <button className="icon-button glass camera-switch" aria-label="Switch camera" title="Switch camera" disabled={!isActive || busy} onClick={() => void switchCamera()}><Icon name="switchCamera" /></button>}
+      <button className="icon-button glass microphone-toggle" aria-label={micMuted ? 'Unmute microphone' : 'Mute microphone'} title={micMuted ? 'Unmute microphone' : 'Mute microphone'} aria-pressed={!micMuted} disabled={!isActive || micPending || recordingState === 'stopping'} onClick={() => void toggleMicrophone()}><Icon name={micMuted ? 'micOff' : 'mic'} /></button>
+      <MicrophoneMeter audio={audioRef.current} active={isActive} muted={micMuted} pending={micPending} />
       {(recordingState === 'starting' || recordingState === 'stopping') && <span className="record-caption" role="status">{recordingState === 'starting' ? 'Getting ready…' : 'Finishing…'}</span>}
     </div>
-    {layoutOpen && <Modal title="Canvas orientation" onClose={() => setLayoutOpen(false)}>
+    <Modal title="Studio settings" subtitle="Customize your studio environment" icon="sliders" open={settingsOpen} expanded={settingsExpanded} onToggleExpanded={() => { setSettingsExpanded(!settingsExpanded); writePreference('expanded-settings', !settingsExpanded); }} onClose={() => setSettingsOpen(false)}>
+      <header className="studio-settings-slider">
+      <div ref={settingsTabsRef} className="studio-settings-tabs" onPointerDown={(event) => {
+        // Touch uses native momentum scrolling and snapping.
+        settingsDrag.current = null;
+        if (event.pointerType !== 'mouse' || event.button !== 0) return;
+        settingsDrag.current = { pointerId: event.pointerId, x: event.clientX, scrollLeft: event.currentTarget.scrollLeft, moved: false };
+      }} onPointerMove={(event) => {
+        const drag = settingsDrag.current;
+        if (!drag || drag.pointerId !== event.pointerId) return;
+        const delta = event.clientX - drag.x;
+        if (!drag.moved && Math.abs(delta) < 6) return;
+        if (!drag.moved) {
+          drag.moved = true;
+          event.currentTarget.setPointerCapture(event.pointerId);
+          event.currentTarget.dataset.dragging = 'true';
+        }
+        event.currentTarget.scrollLeft = drag.scrollLeft - delta;
+      }} onPointerUp={(event) => {
+        delete event.currentTarget.dataset.dragging;
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+      }} onPointerCancel={(event) => {
+        settingsDrag.current = null;
+        delete event.currentTarget.dataset.dragging;
+      }} onLostPointerCapture={(event) => {
+        delete event.currentTarget.dataset.dragging;
+      }} onPointerLeave={() => {
+        if (!settingsDrag.current?.moved) settingsDrag.current = null;
+      }} onClickCapture={(event) => {
+        if (settingsDrag.current?.moved && event.detail !== 0) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        settingsDrag.current = null;
+      }} onDragStart={(event) => event.preventDefault()}>
+        <div className="studio-settings-tab-group" role="tablist" aria-label="Studio settings" aria-describedby="studio-slider-hint">
+        {settingsTabs.map((tab, index) => <button type="button" key={tab.key} role="tab" id={`studio-tab-${tab.key}`} aria-controls={`studio-panel-${tab.key}`} aria-selected={settingsTab === tab.key} tabIndex={settingsTab === tab.key ? 0 : -1} onClick={() => setSettingsTab(tab.key)} onKeyDown={(event) => {
+          const next = event.key === 'ArrowRight' ? (index + 1) % settingsTabs.length : event.key === 'ArrowLeft' ? (index + settingsTabs.length - 1) % settingsTabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? settingsTabs.length - 1 : -1;
+          if (next < 0) return;
+          event.preventDefault(); setSettingsTab(settingsTabs[next].key);
+          event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next].focus();
+        }}><Icon name={tab.icon} size={21} /><span>{tab.label}</span></button>)}
+        </div>
+      </div>
+        <span className="studio-slider-arrow studio-slider-arrow-left" aria-hidden="true"><Icon name="back" size={16} /></span>
+        <span className="studio-slider-arrow studio-slider-arrow-right" aria-hidden="true"><Icon name="back" size={16} /></span>
+        <span id="studio-slider-hint" className="sr-only">Swipe or drag to explore</span>
+      </header>
+      <div id="studio-panel-background" className="studio-tab-content" role="tabpanel" aria-labelledby="studio-tab-background" hidden={settingsTab !== 'background'}>
+        <BackgroundPicker selected={background} onSelect={setBackground} blur={blur} tint={tint} onBlur={setBlur} onTint={setTint} />
+      </div>
+      <div id="studio-panel-filters" className="studio-tab-content" role="tabpanel" aria-labelledby="studio-tab-filters" hidden={settingsTab !== 'filters'}>
+        <CameraFilters value={filters} onChange={setFilters} faceState={faceState} />
+      </div>
+      <div id="studio-panel-effects" className="studio-tab-content" role="tabpanel" aria-labelledby="studio-tab-effects" hidden={settingsTab !== 'effects'}>
+        <CameraEffects value={effects} onChange={setEffects} faceState={faceState} />
+      </div>
+      <SavedLooks settings={{ background, blur, tint, filters, effects, layout }} busy={busy} onApply={(look) => {
+        if (busy) return;
+        setBackground({ ...look.background }); setBlur(look.blur); setTint(look.tint);
+        setFilters({ ...look.filters }); setEffects({ ...look.effects }); setLayout(look.layout);
+      }} />
+      <details className="studio-utility-panel studio-preferences-panel" open><summary><span className="utility-heading-icon"><Icon name="settings" size={23} /></span><span className="utility-heading-copy"><strong>Studio preferences</strong><small>Customize your recording and interface settings.</small></span></summary>
+        <div className="preference-card-list">
+        <label className="preference-toggle preference-card"><span className="preference-icon"><Icon name="timer" size={23} /></span><span className="preference-copy"><strong>3-second countdown</strong><small>You can skip or cancel before recording starts.</small></span><input type="checkbox" role="switch" checked={countdownEnabled} onChange={(event) => { setCountdownEnabled(event.target.checked); writePreference('countdown', event.target.checked); }} /></label>
+        <label className="preference-toggle preference-card">
+          <span className="preference-icon"><Icon name="mic" size={23} /></span>
+          <span className="preference-copy"><strong>Noise cancellation</strong><small>{noiseNotice || 'Reduce microphone background noise. Turn off to keep more ambient sound where supported.'}</small></span>
+          <input type="checkbox" role="switch" checked={noiseCancellation} disabled={noisePending} onChange={async (event) => {
+            const enabled = event.target.checked;
+            setNoiseCancellation(enabled); writePreference('noise-cancellation', enabled); setNoisePending(true);
+            try {
+              const applied = await audioRef.current.setNoiseCancellation(enabled);
+              setNoiseNotice(applied ? '' : 'Your browser or microphone does not support this noise cancellation setting.');
+            } finally { setNoisePending(false); }
+          }} />
+        </label>
+        <MotionToggle />
+        </div>
+      </details>
+    </Modal>
+    {layoutOpen && <Modal variant="dialog" title="Canvas orientation" onClose={() => setLayoutOpen(false)}>
       <div className="orientation-options" role="group" aria-label="Canvas orientation">
         {(['portrait', 'landscape', 'square'] as const).map((option) => <button key={option} disabled={busy} aria-pressed={layout === option} onClick={() => { setLayout(option); setLayoutOpen(false); }}>
+          {layout === option && <span className="orientation-check" aria-hidden="true"><Icon name="check" size={14} /></span>}
           <Icon name={option} size={36} /><span>{{ portrait: 'Portrait', landscape: 'Landscape', square: 'Square' }[option]}</span><small>{{ portrait: '9:16', landscape: '16:9', square: '16:16' }[option]}</small>
         </button>)}
       </div>

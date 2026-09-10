@@ -94,7 +94,14 @@ export class FaceTracker {
     trace(this.eyeLoops); ctx.fillStyle = '#00ff00'; ctx.fill('evenodd');
     ctx.filter = 'none';
     ctx.globalCompositeOperation = 'source-over';
-    return { mask: this.canvas, eyes };
+    const top = points[10], bottom = points[152], left = points[234], right = points[454];
+    const aspect = width / height;
+    const roll = Math.atan2((right.y - left.y), (right.x - left.x) * aspect);
+    const distance = (a: NormalizedLandmark, b: NormalizedLandmark) => Math.hypot((a.x - b.x) * aspect, a.y - b.y);
+    return { mask: this.canvas, eyes, pose: {
+      center: [(top.x + bottom.x) / 2, (top.y + bottom.y) / 2],
+      radius: [Math.max(distance(left, right) / aspect / 2, 0.001), Math.max(distance(top, bottom) / 2, 0.001)], roll,
+    } };
   }
 
   private eyeBounds(points: NormalizedLandmark[], video: HTMLVideoElement | HTMLCanvasElement): [number, number, number, number] {
