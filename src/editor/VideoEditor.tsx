@@ -1,3 +1,4 @@
+import { AppVersion } from '../components/AppVersion';
 import { EmojiPicker } from '../components/EmojiPicker';
 import { ColorPicker } from '../components/ColorPicker';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
@@ -161,7 +162,7 @@ export default function VideoEditor() {
   return <div className="video-editor">
     <header className="editor-header">
       <a className="icon-button" href="/" aria-label="Back to camera" title="Back to camera" onClick={(event) => { if (locked) event.preventDefault(); }} aria-disabled={locked}><Icon name="back" /></a>
-      <div><h1>Video editor</h1><p>{info?.name ?? 'Make it yours.'}</p></div>
+      <div><h1>Video editor <AppVersion /></h1><p>{info?.name ?? 'Make it yours.'}</p></div>
       <div className="editor-header-actions">
         <Tool icon="upload" label="Upload video" disabled={locked} onClick={() => videoInput.current?.click()} />
         {result && <Tool icon="play" label="Review exported video" disabled={locked} onClick={() => setSaveOpen(true)} />}

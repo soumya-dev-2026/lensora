@@ -1,3 +1,4 @@
+import { AppVersion } from './components/AppVersion';
 import { LiveImageControls } from './components/LiveImageControls';
 import type { LiveImage } from './rendering/liveImages';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -465,7 +466,7 @@ function App() {
         <MotionToggle />
         </div>
       </details>
-      <footer className="studio-creator">Creator: <strong>Soumya Pal</strong></footer>
+      <footer className="studio-creator">Creator: <strong>Soumya Pal</strong> <AppVersion /></footer>
     </Modal>
     {layoutOpen && <Modal variant="dialog" title="Canvas orientation" onClose={() => setLayoutOpen(false)}>
       <div className="orientation-options" role="group" aria-label="Canvas orientation">

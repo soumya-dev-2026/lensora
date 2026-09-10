@@ -112,7 +112,7 @@ test('closing save preserves the clip on cancel; delete clears it and restarts t
       const DEFAULT_FILTERS = {};
       const DEFAULT_EFFECTS = {};
       const CameraPreview = () => null, BackgroundPicker = () => null, CameraFilters = () => null, CameraEffects = () => null;
-      const Icon = () => null; const ColorPicker = () => null;
+      const Icon = () => null; const AppVersion = () => null; const ColorPicker = () => null;
       const GaugeSlider = globalThis.GaugeSlider;
       const SwipeSlider = ({ children }) => React.createElement('div', {}, children);
       const Modal = ({ title, children, onClose, open = true }) => open ? React.createElement('section', { title, onClose }, children) : null;
@@ -184,13 +184,13 @@ test('effects panel updates independent settings, disables controls, and resets 
   const { DEFAULT_EFFECTS } = await load('../src/types/effects.ts');
   globalThis.effectDefaults = DEFAULT_EFFECTS;
   globalThis.GaugeSlider = (await load('../src/components/GaugeSlider.tsx', (source) =>
-    `const React = globalThis.React; const { useId, useRef, useState } = React; const Icon = () => null; const ColorPicker = () => null;\n` + source.replace(/^import .*;$/gm, ''))).GaugeSlider;
+    `const React = globalThis.React; const { useId, useRef, useState } = React; const Icon = () => null; const AppVersion = () => null; const ColorPicker = () => null;\n` + source.replace(/^import .*;$/gm, ''))).GaugeSlider;
   const { CameraEffects } = await load('../src/components/CameraEffects.tsx', (source) => source
     .replace(/^import .*;$/gm, '')
     .replace('export function CameraEffects', `const React = globalThis.React;
       const { useId, useState } = React;
       const DEFAULT_EFFECTS = globalThis.effectDefaults;
-      const Icon = () => null; const ColorPicker = () => null;
+      const Icon = () => null; const AppVersion = () => null; const ColorPicker = () => null;
       const GaugeSlider = globalThis.GaugeSlider;
       const SwipeSlider = ({ children }) => React.createElement('div', {}, children);
       const Modal = ({ children }) => React.createElement('section', {}, children);

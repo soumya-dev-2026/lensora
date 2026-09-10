@@ -27,10 +27,10 @@ function environment() {
   };
 }
 const { RecordingCountdown } = await load('../src/components/RecordingCountdown.tsx');
-const { CompareButton } = await load('../src/components/CompareButton.tsx', 'const Icon = () => null; const ColorPicker = () => null;');
+const { CompareButton } = await load('../src/components/CompareButton.tsx', 'const Icon = () => null; const AppVersion = () => null; const ColorPicker = () => null;');
 const prefs = await load('../src/storage/uiPreferences.ts');
 globalThis.usabilityPrefs = prefs;
-const { MotionToggle } = await load('../src/components/MotionToggle.tsx', 'const { readPreference, writePreference } = globalThis.usabilityPrefs; const Icon = () => null; const ColorPicker = () => null;');
+const { MotionToggle } = await load('../src/components/MotionToggle.tsx', 'const { readPreference, writePreference } = globalThis.usabilityPrefs; const Icon = () => null; const AppVersion = () => null; const ColorPicker = () => null;');
 globalThis.usabilityDefaults = {
   ...(await load('../src/types/filters.ts')), ...(await load('../src/types/effects.ts')),
 };
@@ -148,7 +148,7 @@ test('record preparation, countdown cancellation, skip, comparison, and saved-lo
   const { default: App } = await load('../src/App.tsx', `
     const { DEFAULT_FILTERS, DEFAULT_EFFECTS, readPreference, writePreference, RecordingCountdown, CompareButton, useCamera, RecordingAudio } = globalThis.usabilityApp;
     const DEFAULT_LIVE_TEXT = { enabled: false }; const LiveTextControls = () => null; const LiveImageControls = () => null;
-    const BACKGROUNDS = [{ src: '/backgrounds/studio.svg' }]; const Icon = () => null; const ColorPicker = () => null;
+    const BACKGROUNDS = [{ src: '/backgrounds/studio.svg' }]; const Icon = () => null; const AppVersion = () => null; const ColorPicker = () => null;
     const CameraPreview = () => null, BackgroundPicker = () => null, CameraFilters = () => null, CameraEffects = () => null, MicrophoneMeter = () => null, MotionToggle = () => null;
     const SavedLooks = () => null;
     const Modal = ({ children, open = true }) => open ? React.createElement('section', {}, children) : null;

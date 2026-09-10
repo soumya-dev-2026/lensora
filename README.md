@@ -97,3 +97,39 @@ For a camera/browser check:
 - Close the save dialog using its close icon, Escape, and backdrop; cancel to recover the same clip, or delete to restart the camera.
 - Upload and save a background, reload, select it again, then restore the original and reload.
 - Check camera permission denial and retry, image upload errors, and camera stop/restart.
+
+## Versions and releases
+
+`package.json` is the source of truth for the app version. The same version appears in the studio settings footer and video editor header. Release notes are kept in [CHANGELOG.md](CHANGELOG.md).
+
+Choose the size of the next update:
+
+```sh
+npm run version:patch # Fixes: 0.2.0 → 0.2.1
+npm run version:minor # New features: 0.2.0 → 0.3.0
+npm run version:major # Breaking changes: 0.2.0 → 1.0.0
+```
+
+These commands run the tests first, update `package.json` and `package-lock.json` together, then build the new version. They do not create Git commits or tags, push code, or deploy. If the build fails after the version changes, fix it and rerun `npm run build` before committing.
+
+For a release, move the relevant notes from **Unreleased** to a dated version heading in the changelog, review and commit the changes, then create an annotated Git tag matching the version (for example, `git tag -a v0.2.0 -m 'Release v0.2.0'`). Push the branch and that specific tag when ready. Deploy separately with `npm run deploy`.
+# Android APK
+
+The Android app is packaged with Capacitor as **Lensora** (`com.lensora.studio`).
+Use Node 22+, Java 21, and an Android SDK with platform 36. Set `JAVA_HOME`
+and `ANDROID_HOME` to your local installations, then run:
+
+```sh
+npm ci
+npm run android:apk
+```
+
+The installable debug APK is `android/app/build/outputs/apk/debug/app-debug.apk`.
+Copy it to a folder outside this project to distribute it for testing.
+Android version name/code are derived from `package.json` (major × 10000 + minor × 100 + patch).
+This debug build is for sideload testing; a store release requires a private release signing key.
+
+Camera and microphone permissions are requested when used. Video downloads open
+Android's share sheet, where a compatible Files/Drive app can save the MP4.
+Shared videos remain in the app cache so receiving apps can read them; Android can
+reclaim that cache. AI segmentation and face models currently require internet access.

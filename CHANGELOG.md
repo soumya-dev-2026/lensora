@@ -1,0 +1,31 @@
+# Changelog
+
+## Unreleased
+
+## 0.2.0 — 2026-09-10
+
+### Added
+
+- Studio image overlays with opacity, size, drag positioning, and recording support.
+- Saved sticker library with built-in presets and custom uploads remembered on this device.
+- Searchable emoji popup with 116 emojis for captions, stickers, and editor overlays.
+- Custom color wheel with brightness, hex entry, white/black-first presets, and opacity where supported.
+- Editor noise reduction for original video audio, applied to preview and MP4 export.
+- Image opacity in the video editor.
+- Visible app version and commands for patch, minor, and major version updates.
+- Android app packaging with native video sharing and a debug APK in `releases/`.
+
+### Changed
+
+- Compact studio and editor layouts, slim glossy editor sliders, and subtle mint gradient borders.
+- Connected settings tabs and content panels; toolbar retains Background and Filters.
+- Saved looks and Studio preferences start collapsed.
+- Removed the settings panel fullscreen control.
+
+### Fixed
+
+- Closing nested popups with Escape leaves the settings panel open.
+
+## 0.1.0
+
+- Initial camera studio and video editor, including background replacement, effects, split camera, live text, and local MP4 recording/export.

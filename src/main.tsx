@@ -5,6 +5,9 @@ const VideoEditor = lazy(() => import('./editor/VideoEditor'));
 import './index.css';
 import { readPreference } from './storage/uiPreferences';
 import { StartupSplash } from './components/StartupSplash';
+import { installNativeDownloads } from './nativeDownloads';
+
+installNativeDownloads();
 
 document.documentElement.dataset.motion = readPreference('animations') ? 'on' : 'off';
 
