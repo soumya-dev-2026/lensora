@@ -56,6 +56,7 @@ const shapes = {
   close: <path d="m6 6 12 12M6 18 18 6" />,
   camera: <><path d="m8 5 2-2h4l2 2h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" /><circle cx="12" cy="13" r="4" /></>,
   cameraOff: <><path d="m2 2 20 20M9 5l1-2h4l2 2h4a2 2 0 0 1 2 2v10M3 6a2 2 0 0 0-1 1v12a2 2 0 0 0 2 2h15M9 10a4 4 0 0 0 5 6" /></>,
+  splitCamera: <><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M12 4v16" /></>,
   switchCamera: <><path d="M3 9a9 9 0 0 1 15-5l3 3M21 2v5h-5M21 15A9 9 0 0 1 6 20l-3-3M3 22v-5h5" /><circle cx="12" cy="12" r="3" /></>,
   play: <path d="m8 4 12 8-12 8Z" fill="currentColor" />,
   pause: <><path d="M8 5v14M16 5v14" strokeWidth="4" /></>,

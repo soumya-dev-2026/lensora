@@ -17,6 +17,11 @@ type CameraEventListener = (state: CameraState) => void;
 
 export class CameraManager {
   private stream: MediaStream | null = null;
+  private secondaryStream: MediaStream | null = null;
+  private splitPending = false;
+  private splitError: string | null = null;
+  private splitRequest = 0;
+  private splitCleanup: (() => void) | null = null;
   private facingMode: 'user' | 'environment' = 'user';
   private isActive: boolean = false;
   private error: string | null = null;
@@ -68,6 +73,7 @@ export class CameraManager {
 
     try {
       this.error = null;
+      this.splitError = null;
       this.facingMode = options.facingMode || 'user';
 
       const constraints: MediaStreamConstraints = {
@@ -93,6 +99,7 @@ export class CameraManager {
    * Stop the camera and clean up resources
    */
   stop(): void {
+    this.stopSplitCamera();
     if (this.stream) {
       this.stream.getTracks().forEach((track) => {
         track.stop();
@@ -112,6 +119,7 @@ export class CameraManager {
       throw new Error('Camera is not active');
     }
 
+    this.stopSplitCamera();
     const newFacingMode = this.facingMode === 'user' ? 'environment' : 'user';
     const previousFacingMode = this.facingMode;
     const currentStream = this.stream;
@@ -133,6 +141,78 @@ export class CameraManager {
     }
   }
 
+  stopSplitCamera(): void {
+    this.splitRequest++;
+    this.splitCleanup?.();
+    this.splitCleanup = null;
+    this.secondaryStream?.getTracks().forEach((track) => track.stop());
+    this.secondaryStream = null;
+    this.splitPending = false;
+    this.splitError = null;
+    this.notifyListeners();
+  }
+
+  async startSplitCamera(): Promise<void> {
+    if (!this.isActive || this.secondaryStream || this.splitPending) return;
+    const request = ++this.splitRequest;
+    const primary = this.stream!.getVideoTracks()[0];
+    const currentId = primary.getSettings().deviceId;
+    let secondary: MediaStream | null = null;
+    this.splitPending = true;
+    this.splitError = null;
+    this.notifyListeners();
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      if (request !== this.splitRequest) return;
+      const other = devices.find((device) => device.kind === 'videoinput' && device.deviceId && device.deviceId !== currentId);
+      if (!currentId || !other) throw new Error('A second camera was not found. Connect or allow access to another camera.');
+      secondary = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: { exact: other.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+        audio: false,
+      });
+      if (request !== this.splitRequest) { secondary.getTracks().forEach((track) => track.stop()); return; }
+      const secondTrack = secondary.getVideoTracks()[0];
+      if (!secondTrack || secondTrack.getSettings().deviceId === currentId || primary.muted || primary.readyState === 'ended' || secondTrack.muted || secondTrack.readyState === 'ended') {
+        throw new Error('This device cannot keep both cameras active at the same time.');
+      }
+      this.secondaryStream = secondary;
+      const unavailable = () => {
+        this.stopSplitCamera();
+        if (primary.muted || primary.readyState === 'ended') this.stop();
+        this.splitError = this.isActive
+          ? 'The second camera became unavailable. Returned to single-camera mode.'
+          : 'This device could not keep both cameras active. Start the camera again to use single-camera mode.';
+        this.notifyListeners();
+      };
+      for (const track of [primary, secondTrack]) {
+        track.addEventListener('ended', unavailable);
+        track.addEventListener('mute', unavailable);
+      }
+      this.splitCleanup = () => {
+        for (const track of [primary, secondTrack]) {
+          track.removeEventListener('ended', unavailable);
+          track.removeEventListener('mute', unavailable);
+        }
+      };
+    } catch (error) {
+      secondary?.getTracks().forEach((track) => track.stop());
+      if (request !== this.splitRequest) return;
+      if (primary.muted || primary.readyState === 'ended') {
+        this.stop();
+        this.splitError = 'This device could not keep both cameras active. Start the camera again to use single-camera mode.';
+        this.notifyListeners();
+        return;
+      }
+      this.splitError = error instanceof Error && error.name === 'Error'
+        ? error.message : 'Could not open both cameras. Your device or browser may only support one camera at a time.';
+    } finally {
+      if (request === this.splitRequest) {
+        this.splitPending = false;
+        this.notifyListeners();
+      }
+    }
+  }
+
   /**
    * Get the current MediaStream
    */
@@ -148,6 +228,9 @@ export class CameraManager {
       isActive: this.isActive,
       facingMode: this.facingMode,
       stream: this.stream,
+      secondaryStream: this.secondaryStream,
+      splitPending: this.splitPending,
+      splitError: this.splitError,
       error: this.error,
     };
   }

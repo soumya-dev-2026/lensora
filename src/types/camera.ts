@@ -42,6 +42,9 @@ export interface CameraState {
   isActive: boolean;
   facingMode: 'user' | 'environment';
   stream: MediaStream | null;
+  secondaryStream: MediaStream | null;
+  splitPending: boolean;
+  splitError: string | null;
   error: string | null;
 }
 
@@ -51,6 +54,8 @@ export interface CameraPreviewProps {
   layout: CanvasLayout;
   videoRef: React.RefObject<HTMLVideoElement>;
   canvasRef: React.RefObject<HTMLCanvasElement>;
+  secondaryVideoRef?: React.RefObject<HTMLVideoElement>;
+  splitCamera?: boolean;
   isActive: boolean;
   facingMode: 'user' | 'environment';
   background: BackgroundSelection;

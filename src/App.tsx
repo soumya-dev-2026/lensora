@@ -108,10 +108,14 @@ function App() {
   const [startRequest, setStartRequest] = useState(0);
   const accumulated = useRef(0);
   const startedAt = useRef(0);
-  const { videoRef, isActive, facingMode, error, startCamera, stopCamera, switchCamera, isSupported, hasMultipleCameras } = useCamera();
+  const { videoRef, isActive, facingMode, error, startCamera, stopCamera, switchCamera, isSupported, hasMultipleCameras, secondaryVideoRef, splitCamera = false, splitPending = false, splitError, setSplitCamera } = useCamera();
   const cameraActive = useRef(isActive);
   cameraActive.current = isActive;
-  const busy = recordingState !== 'idle';
+  const busy = recordingState !== 'idle' || splitPending;
+  useEffect(() => {
+    const recorder = recorderRef.current;
+    if (!isActive && recorder && recorder.state !== 'inactive') recorder.stop();
+  }, [isActive]);
   const showTimer = recordingState === 'recording' || recordingState === 'paused' || recordingState === 'stopping';
 
   const handleProcessingState = useCallback((state: typeof processing, message?: string) => {
@@ -318,14 +322,14 @@ function App() {
       else await studioRef.current?.requestFullscreen();
     } catch { setRecordingError('Fullscreen is unavailable in this browser. The canvas still fills the studio view.'); }
   };
-  const message = error || processingError || recordingError;
+  const message = error || splitError || processingError || recordingError;
 
   return <div className="studio" data-camera-active={isActive} ref={studioRef}>
     <main className="stage" aria-label="Camera studio">
-      <CameraPreview layout={layout} videoRef={videoRef} canvasRef={canvasRef} isActive={isActive} facingMode={facingMode} background={background} blur={blur} tint={tint} filters={filters} effects={effects} comparing={comparing} onStartCamera={() => void startPreview()} cameraStarting={cameraStarting} cameraDisabled={!isSupported || busy} onFaceTrackingState={setFaceState} onProcessingState={handleProcessingState} />
+      <CameraPreview layout={layout} videoRef={videoRef} canvasRef={canvasRef} secondaryVideoRef={secondaryVideoRef} splitCamera={splitCamera} isActive={isActive} facingMode={facingMode} background={background} blur={blur} tint={tint} filters={filters} effects={effects} comparing={comparing} onStartCamera={() => void startPreview()} cameraStarting={cameraStarting} cameraDisabled={!isSupported || busy} onFaceTrackingState={setFaceState} onProcessingState={handleProcessingState} />
     </main>
     {recordingState === 'countdown' && <RecordingCountdown onComplete={beginRecording} onCancel={cancelRecordingStart} />}
-    {isActive && processing === 'ready' && recordingState !== 'countdown' && recordingState !== 'starting' && <CompareButton onChange={setComparing} />}
+    {isActive && !splitCamera && processing === 'ready' && recordingState !== 'countdown' && recordingState !== 'starting' && <CompareButton onChange={setComparing} />}
     {showTimer && <div className={`recording-time ${recordingState === 'recording' ? 'live' : ''}`} role="timer" aria-label={`${recordingState === 'paused' ? 'Paused' : 'Recording time'} ${formatTime(elapsed)}`}>
       {recordingState === 'paused' ? <Icon name="pause" size={12} /> : <i aria-hidden="true" />}{formatTime(elapsed)}
     </div>}
@@ -337,7 +341,7 @@ function App() {
     <div className="top-right">
       <button className="icon-button glass" aria-label="Canvas orientation" title="Canvas orientation" aria-haspopup="dialog" disabled={busy} onClick={() => setLayoutOpen(true)}><Icon name={layout} /></button>
       <button className="icon-button glass" aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} title={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} onClick={() => void toggleFullscreen()}><Icon name={fullscreen ? 'collapse' : 'expand'} /></button>
-      {hasMultipleCameras && <button className="icon-button glass camera-switch" aria-label="Switch camera" title="Switch camera" disabled={!isActive || busy} onClick={() => void switchCamera()}><Icon name="switchCamera" /></button>}
+      {hasMultipleCameras && <button className="icon-button glass camera-switch" aria-label="Switch camera" title="Switch camera" disabled={!isActive || busy || splitCamera} onClick={() => void switchCamera()}><Icon name="switchCamera" /></button>}
     </div>
     <div className="status-area" aria-live="polite">
       {!isSupported && <p role="alert">Camera access is unavailable. Open this app over HTTPS in a camera-capable browser.</p>}
@@ -437,6 +441,12 @@ function App() {
             } finally { setNoisePending(false); }
           }} />
         </label>
+        <label className="preference-toggle preference-card">
+          <span className="preference-icon"><Icon name="splitCamera" size={23} /></span>
+          <span className="preference-copy"><strong>Split camera</strong><small>{splitPending ? 'Opening second camera…' : !isActive ? 'Start the camera to use two cameras together.' : 'Record two cameras together. Landscape: side by side. Portrait: stacked. Effects apply to the main camera.'}</small></span>
+          <input type="checkbox" role="switch" checked={splitCamera} disabled={!isActive || busy} onChange={(event) => { setComparing(false); void setSplitCamera(event.target.checked); }} />
+        </label>
+        {splitError && <p role="alert">{splitError}</p>}
         <MotionToggle />
         </div>
       </details>

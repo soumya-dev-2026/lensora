@@ -328,3 +328,19 @@ test('new looks and effects have neutral defaults, independent strength, and com
   for (const key of ['look', 'lookIntensity', 'sharpen', 'vignette', 'outline']) assert.deepEqual(uniforms.get(`u_${key}`), [0]);
   compositor.dispose();
 });
+
+test('split view crops each camera to its own viewport and restores full-frame rendering', () => {
+  const { compositor, calls, uniforms } = fixture();
+  const video = { videoWidth: 1280, videoHeight: 720 };
+  const mask = new Uint8Array([255]);
+  compositor.render(video, mask, 1, 1, false, true, 0, 0, undefined, undefined, null, undefined, 0,
+    { x: 0, y: 640, width: 720, height: 640 });
+  assert.deepEqual(calls.findLast(([name]) => name === 'viewport'), ['viewport', 0, 640, 720, 640]);
+  assert.deepEqual(uniforms.get('u_cameraScale'), [0.6328125, 1]);
+  compositor.render(video, mask, 1, 1, false, true, 0, 0, undefined, undefined, null, undefined, 0,
+    { x: 640, y: 0, width: 640, height: 720 });
+  assert.deepEqual(calls.findLast(([name]) => name === 'viewport'), ['viewport', 640, 0, 640, 720]);
+  assert.deepEqual(uniforms.get('u_cameraScale'), [0.5, 1]);
+  compositor.render(video, mask, 1, 1, false);
+  assert.deepEqual(calls.findLast(([name]) => name === 'viewport'), ['viewport', 0, 0, 720, 1280]);
+});

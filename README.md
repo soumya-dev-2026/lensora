@@ -23,6 +23,12 @@ Open the local URL printed by Vite. Camera access requires localhost or HTTPS, c
 
 Recordings contain the composed canvas without the floating controls. The microphone starts unmuted when the camera starts, after browser permission is granted. If permission is denied or no microphone is available, recording continues muted with a message. Use the microphone icon to mute or unmute before or during recording; mute stops microphone capture while preserving the recording. No live microphone audio is played through the speakers. Stopping the camera releases the microphone. Stopping a recording keeps your selected microphone state while the camera remains active.
 
+## Split camera
+
+Start the camera, open any studio settings popup, and enable **Studio preferences → Split camera**. The app opens a second available camera: landscape and square canvases show the feeds side by side; portrait stacks them. Both feeds are included in the recording. Backgrounds, filters, and effects apply to the main camera; the second feed stays unprocessed. Turn split mode off to return to one camera or switch front/rear cameras. Split mode cannot be changed during recording.
+
+Two simultaneous cameras require device and browser support. If the second camera cannot open, the app shows a message. If opening it interrupts the main camera, start the camera again to return to single-camera mode. Stopping the camera or leaving the studio releases both streams.
+
 ## Camera filters
 
 The sparkle icon at the top left opens the centered **Camera filters** popup. All popups use translucent surfaces and blurred backdrops, and close with the close icon, Escape, or a click outside. They work during recording.

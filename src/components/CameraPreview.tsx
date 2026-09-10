@@ -7,7 +7,9 @@ import type { FaceFeatures } from '../types/filters';
 import { WebGLCompositor } from '../rendering/WebGLCompositor';
 import styles from './CameraPreview.module.css';
 
-export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMode, background, blur, tint, filters, effects, comparing = false, onStartCamera, cameraStarting = false, cameraDisabled = false, onFaceTrackingState, onProcessingState }: CameraPreviewProps) {
+export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, splitCamera = false, isActive, facingMode, background, blur, tint, filters, effects, comparing = false, onStartCamera, cameraStarting = false, cameraDisabled = false, onFaceTrackingState, onProcessingState }: CameraPreviewProps) {
+  const splitSettings = useRef({ splitCamera, layout });
+  splitSettings.current = { splitCamera, layout };
   const originalRef = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const original = originalRef.current;
@@ -74,6 +76,7 @@ export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMod
     let usesVideoCallback = false;
     const sourceVideo = videoRef.current;
     let lastVideoTime = -1;
+    const opaqueMask = new Uint8Array([255]);
     let compositor: WebGLCompositor | undefined;
     const segmenter = new PersonSegmenter();
     const segmentationInput = new SegmentationInput();
@@ -117,7 +120,20 @@ export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMod
                     onFaceTrackingState('error');
                   }
                 }
-                compositor!.render(segmentationInput.frame, mask.data, mask.width, mask.height, facingMode === 'user', effect.background.kind === 'blur', effect.blur, effect.tint, effect.filters, mask.regions, face, effect.effects, time / 1000);
+                const canvas = canvasRef.current!;
+                const second = secondaryVideoRef?.current;
+                const split = splitSettings.current.splitCamera && second && second.readyState >= 2;
+                const stacked = splitSettings.current.layout === 'portrait';
+                const width = split && !stacked ? canvas.width / 2 : canvas.width;
+                const height = split && stacked ? canvas.height / 2 : canvas.height;
+                compositor!.render(segmentationInput.frame, mask.data, mask.width, mask.height, facingMode === 'user', effect.background.kind === 'blur', effect.blur, effect.tint, effect.filters, mask.regions, face, effect.effects, time / 1000,
+                  { x: 0, y: split && stacked ? height : 0, width, height });
+                if (split) {
+                  const stream = second.srcObject as MediaStream | null;
+                  const mirror = stream?.getVideoTracks()[0]?.getSettings().facingMode === 'user';
+                  compositor!.render(second, opaqueMask, 1, 1, mirror, true, 0, 0, undefined, undefined, null, undefined, time / 1000,
+                    { x: stacked ? 0 : width, y: 0, width, height });
+                }
                 if (!ready) { ready = true; onProcessingState?.('ready'); }
               }
             }
@@ -136,10 +152,11 @@ export function CameraPreview({ layout, videoRef, canvasRef, isActive, facingMod
       compositor?.dispose();
       compositorRef.current = null;
     };
-  }, [isActive, facingMode, onProcessingState, onFaceTrackingState, videoRef, canvasRef]);
+  }, [isActive, facingMode, onProcessingState, onFaceTrackingState, videoRef, canvasRef, secondaryVideoRef]);
 
   return <div className={`${styles.container} ${styles[layout]}${!isActive ? ` ${styles.idle}` : ''}`}>
     <video ref={videoRef} className={styles.sourceVideo} autoPlay playsInline muted />
+    <video ref={secondaryVideoRef} className={styles.sourceVideo} autoPlay playsInline muted />
     <canvas ref={canvasRef} className={styles.canvas} width={layout === 'portrait' ? 720 : 1280} height={layout === 'landscape' ? 720 : 1280} />
     {isActive && comparing && <><video ref={originalRef} className={styles.originalPreview} style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : undefined }} autoPlay playsInline muted /><span className={styles.originalLabel}>Original preview</span></>}
     {!isActive && <div className={styles.overlay}>

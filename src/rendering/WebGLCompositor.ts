@@ -477,17 +477,18 @@ export class WebGLCompositor {
     gl.deleteProgram(this.program);
   }
 
-  render(video: HTMLVideoElement | HTMLCanvasElement, mask: Uint8Array, maskWidth: number, maskHeight: number, mirror: boolean, liveBackground = false, blur = 0, tint = 0, filters?: CameraFilters, regions?: Uint8Array, face?: FaceFeatures | null, effects?: CameraEffects, time = 0): void {
+  render(video: HTMLVideoElement | HTMLCanvasElement, mask: Uint8Array, maskWidth: number, maskHeight: number, mirror: boolean, liveBackground = false, blur = 0, tint = 0, filters?: CameraFilters, regions?: Uint8Array, face?: FaceFeatures | null, effects?: CameraEffects, time = 0, viewport?: { x: number; y: number; width: number; height: number }): void {
     const sourceWidth = 'videoWidth' in video ? video.videoWidth : video.width;
     const sourceHeight = 'videoHeight' in video ? video.videoHeight : video.height;
     const { gl } = this;
-    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    const { x, y, width, height } = viewport ?? { x: 0, y: 0, width: this.canvas.width, height: this.canvas.height };
+    gl.viewport(x, y, width, height);
     gl.useProgram(this.program);
     const enabled = effects?.enabled;
     const pose = face?.pose;
     gl.uniform4f(this.filterLocations.get('pose')!, pose?.center[0] ?? 0, pose?.center[1] ?? 0, pose?.radius[0] ?? 0, pose?.radius[1] ?? 0);
     const effectValues = {
-      time: time % 3600, sourceAspect: sourceWidth / sourceHeight, outputAspect: this.canvas.width / this.canvas.height,
+      time: time % 3600, sourceAspect: sourceWidth / sourceHeight, outputAspect: width / height,
       roll: pose?.roll ?? 0,
       look: filters?.enabled ? Math.max(0, ['none', 'natural', 'cinematic', 'warm', 'cool', 'vintage'].indexOf(filters.look ?? 'none')) : 0,
       lookIntensity: filters?.enabled ? (filters.lookIntensity ?? 100) / 100 : 0,
@@ -523,7 +524,7 @@ export class WebGLCompositor {
     gl.uniform1i(this.liveBackgroundLocation, liveBackground ? 1 : 0);
     gl.uniform2f(this.backgroundTexelLocation, 1 / (liveBackground ? sourceWidth : this.backgroundWidth), 1 / (liveBackground ? sourceHeight : this.backgroundHeight));
     // Center-crop both sources to fill the output without stretching.
-    const outputAspect = this.canvas.width / this.canvas.height;
+    const outputAspect = width / height;
     const cameraAspect = sourceWidth / sourceHeight;
     gl.uniform2f(this.cameraScaleLocation, Math.min(1, outputAspect / cameraAspect), Math.min(1, cameraAspect / outputAspect));
     gl.uniform2f(this.backgroundScaleLocation, Math.min(1, outputAspect / this.backgroundAspect), Math.min(1, this.backgroundAspect / outputAspect));
@@ -541,8 +542,8 @@ export class WebGLCompositor {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, maskWidth, maskHeight, 0, gl.RED, gl.UNSIGNED_BYTE, mask);
     gl.uniform2f(this.maskPixelLocation,
-      Math.min(1, outputAspect / cameraAspect) / this.canvas.width,
-      Math.min(1, cameraAspect / outputAspect) / this.canvas.height);
+      Math.min(1, outputAspect / cameraAspect) / width,
+      Math.min(1, cameraAspect / outputAspect) / height);
     gl.uniform1i(this.mirrorLocation, mirror ? 1 : 0);
     gl.activeTexture(gl.TEXTURE3);
     gl.bindTexture(gl.TEXTURE_2D, this.regionsTexture);
