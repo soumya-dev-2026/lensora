@@ -90,6 +90,7 @@ function App() {
   const [layout, setLayout] = useState<CanvasLayout>(getDefaultLayout);
   const [layoutOpen, setLayoutOpen] = useState(false);
   const [background, setBackground] = useState<BackgroundSelection>({ kind: 'image', value: BACKGROUNDS[0].src });
+  const [maskEnabled, setMaskEnabled] = useState(false);
   const [blur, setBlur] = useState(0);
   const [tint, setTint] = useState(0);
   const [processing, setProcessing] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
@@ -334,14 +335,15 @@ function App() {
 
   return <div className="studio" data-camera-active={isActive} ref={studioRef}>
     <main className="stage" aria-label="Camera studio">
-      <CameraPreview layout={layout} videoRef={videoRef} canvasRef={canvasRef} secondaryVideoRef={secondaryVideoRef} splitCamera={splitCamera} liveImages={liveImages} onLiveImagesChange={setLiveImages} liveText={liveText} onLiveTextChange={setLiveText} isActive={isActive} facingMode={facingMode} background={background} blur={blur} tint={tint} filters={filters} effects={effects} comparing={comparing} onStartCamera={() => void startPreview()} cameraStarting={cameraStarting} cameraDisabled={!isSupported || busy} onFaceTrackingState={setFaceState} onProcessingState={handleProcessingState} />
+      <CameraPreview layout={layout} videoRef={videoRef} canvasRef={canvasRef} secondaryVideoRef={secondaryVideoRef} splitCamera={splitCamera} maskEnabled={maskEnabled} liveImages={liveImages} onLiveImagesChange={setLiveImages} liveText={liveText} onLiveTextChange={setLiveText} isActive={isActive} facingMode={facingMode} background={background} blur={blur} tint={tint} filters={filters} effects={effects} comparing={comparing} onStartCamera={() => void startPreview()} cameraStarting={cameraStarting} cameraDisabled={!isSupported || busy} onFaceTrackingState={setFaceState} onProcessingState={handleProcessingState} />
     </main>
     {recordingState === 'countdown' && <RecordingCountdown onComplete={beginRecording} onCancel={cancelRecordingStart} />}
-    {isActive && !splitCamera && processing === 'ready' && recordingState !== 'countdown' && recordingState !== 'starting' && <CompareButton onChange={setComparing} />}
+    {isActive && maskEnabled && !splitCamera && processing === 'ready' && recordingState !== 'countdown' && recordingState !== 'starting' && <CompareButton onChange={setComparing} />}
     {showTimer && <div className={`recording-time ${recordingState === 'recording' ? 'live' : ''}`} role="timer" aria-label={`${recordingState === 'paused' ? 'Paused' : 'Recording time'} ${formatTime(elapsed)}`}>
       {recordingState === 'paused' ? <Icon name="pause" size={12} /> : <i aria-hidden="true" />}{formatTime(elapsed)}
     </div>}
     <div className="top-left">
+      <button className="icon-button glass" aria-label="Mask" title={maskEnabled ? 'Turn off mask' : 'Apply mask'} aria-pressed={maskEnabled} disabled={busy} onClick={() => { setComparing(false); setMaskEnabled((enabled) => !enabled); }}><Icon name="mask" /></button>
       <button className="icon-button glass" data-current={settingsTab === 'background'} aria-label="Background filters" title="Background" aria-haspopup="dialog" onClick={() => openSettings('background')}><Icon name="image" /></button>
       <button className="icon-button glass" data-current={settingsTab === 'filters'} aria-label="Camera filters" title="Camera filters" aria-haspopup="dialog" onClick={() => openSettings('filters')}><Icon name="sparkle" /></button>
     </div>
@@ -353,7 +355,7 @@ function App() {
     <div className="status-area" aria-live="polite">
       {!isSupported && <p role="alert">Camera access is unavailable. Open this app over HTTPS in a camera-capable browser.</p>}
       {message && <p role="alert">{message}</p>}
-      {processing === 'loading' && <p>Preparing your camera and background…</p>}
+      {processing === 'loading' && <p>{maskEnabled ? 'Loading mask…' : 'Starting camera…'}</p>}
       {recordingState === 'starting' && <button type="button" onClick={cancelRecordingStart}>Cancel recording start</button>}
       {isActive && processing === 'error' && !busy && <button className="icon-button glass" aria-label="Reset camera" title="Reset camera" onClick={stopCamera}><Icon name="reset" /></button>}
       {savedClip && !saveOpen && !discardOpen && <div className="clip-actions"><button className="icon-button glass" aria-label="Review and save video" title="Review and save video" onClick={() => setSaveOpen(true)}><Icon name="download" /></button><button className="icon-button glass" aria-label="New recording" title="New recording" onClick={requestDiscard}><Icon name="plus" /></button></div>}

@@ -162,6 +162,9 @@ test('record preparation, countdown cancellation, skip, comparison, and saved-lo
   active = true;
   await act(async () => renderer.update(React.createElement(App)));
   preview().props.canvasRef.current = { captureStream: () => ({ addTrack() {}, getTracks: () => [] }) };
+  assert.equal(preview().props.maskEnabled, false);
+  await act(async () => button('Mask').props.onClick());
+  assert.equal(preview().props.maskEnabled, true);
   await act(async () => preview().props.onProcessingState('ready'));
   let pending;
   await act(async () => { pending = button('Start recording').props.onClick(); });

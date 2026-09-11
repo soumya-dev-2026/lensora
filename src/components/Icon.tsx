@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 const shapes = {
+  mask: <><path d="M3 5c5-3 13-3 18 0v7c0 6-6 9-9 10-3-1-9-4-9-10Z" /><path d="M12 3v19M6 9h3m6 0h3M8 15q4 3 8 0" /></>,
   bookmark: <path d="M6 3h12a1 1 0 0 1 1 1v18l-7-5-7 5V4a1 1 0 0 1 1-1Z" />,
   timer: <><circle cx="12" cy="14" r="8" /><path d="M12 10v5l2 2M9 2h6M12 2v4M18 6l2-2" /></>,
   motion: <><path d="M9 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9M8 5v3M8 16v3M2 8h3M1 12h9M2 16h3" /></>,

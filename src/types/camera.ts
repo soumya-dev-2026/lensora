@@ -58,6 +58,7 @@ export interface CameraPreviewProps {
   canvasRef: React.RefObject<HTMLCanvasElement>;
   secondaryVideoRef?: React.RefObject<HTMLVideoElement>;
   splitCamera?: boolean;
+  maskEnabled?: boolean;
   liveImages?: LiveImage[];
   onLiveImagesChange?: (value: LiveImage[]) => void;
   liveText?: LiveText;

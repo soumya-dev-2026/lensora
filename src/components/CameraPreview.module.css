@@ -3,6 +3,7 @@
 .portrait { width: min(100vw, 56.25dvh); height: min(100dvh, 177.7778vw); }
 .square { width: min(100vw, 100dvh); height: min(100dvh, 100vw); }
 .sourceVideo { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.startingPreview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; z-index: 1; }
 .canvas { width: 100%; height: 100%; display: block; }
 .idle { width: 100%; height: 100%; background: transparent; }
 .idle .canvas { visibility: hidden; }
