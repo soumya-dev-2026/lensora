@@ -1,0 +1,130 @@
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 720px;
+  margin: 20px auto;
+}
+
+.error {
+  background: #fee;
+  border: 1px solid #f00;
+  color: #c00;
+  padding: 12px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.button {
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: #0066cc;
+  color: white;
+  transition: all 0.2s ease;
+  flex: 1;
+  min-width: 150px;
+}
+
+.button:hover:not(:disabled) {
+  background: #0052a3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.button.active {
+  background: #00cc00;
+}
+
+.button.active:hover {
+  background: #00aa00;
+}
+
+.button.switch {
+  background: #666;
+}
+
+.button.switch:hover:not(:disabled) {
+  background: #555;
+}
+
+.button.recording {
+  background: #c62828;
+}
+
+.button.recording:hover:not(:disabled) {
+  background: #a51f1f;
+}
+
+.button.stop {
+  background: #444;
+}
+
+.button.save {
+  flex: 0 0 auto;
+  background: #087f5b;
+}
+
+.savePanel {
+  padding: 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.savePanel label {
+  display: block;
+  margin-bottom: 8px;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.saveRow {
+  display: flex;
+  gap: 10px;
+}
+
+.saveRow input {
+  min-width: 0;
+  flex: 1;
+  padding: 11px 12px;
+  border: 1px solid #94a3b8;
+  border-radius: 4px;
+  font: inherit;
+}
+
+@media (max-width: 480px) {
+  .button {
+    min-width: 100%;
+  }
+
+  .buttons {
+    flex-direction: column;
+  }
+
+  .saveRow {
+    flex-direction: column;
+  }
+}

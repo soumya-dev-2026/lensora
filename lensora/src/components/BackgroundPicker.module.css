@@ -1,0 +1,32 @@
+.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+.modes button { display: flex; align-items: center; justify-content: center; gap: 9px; padding: 13px; font-size: 12px; background: #ffffff06; border-radius: 12px; }
+.modes button[aria-pressed=true], .options button[aria-pressed=true] { border-color: #b3ecde99; color: #b3ecde; background: #b3ecde13; }
+.colorRow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 18px; font-size: 12px; }
+.colorRow input { width: 40px; height: 32px; padding: 2px; background: none; border: 0; cursor: pointer; }
+.options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.options button { padding: 0 0 10px; overflow: hidden; font-size: 10px; text-align: center; background: #ffffff06; border-radius: 12px; }
+.options img { width: 100%; height: 66px; object-fit: cover; display: block; margin-bottom: 10px; }
+.options span { display: block; padding: 0 4px; }
+.editActions { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 14px; }
+.editActions .upload { position: relative; display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 11px; cursor: pointer; }
+.upload input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.upload:focus-within { outline: 2px solid #b1eee0; outline-offset: 4px; border-radius: 4px; }
+.editActions button { width: 34px; height: 34px; background: transparent; }
+
+.editActions { justify-content: flex-end; }
+.editActions .upload { width: 44px; height: 44px; padding: 0; justify-content: center; border-radius: 50%; background: #ffffff06; }
+.editActions button { width: 44px; height: 44px; }
+
+.modes { gap: 10px; }
+.modes button { min-width: 0; min-height: 44px; padding: 12px 8px; color: #aacfe9; border-color: #79b6dc55; }
+.modes button[aria-pressed=true], .options button[aria-pressed=true] { color: #a6fff3; border-color: #6affeb; background: linear-gradient(120deg, #147b7980, #0b35435c); box-shadow: inset 0 0 0 1px #6affeb, 0 0 16px #48f6db26; }
+.options { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.options button { position: relative; min-width: 0; border-color: #80b5d65c; color: #b5d7ee; padding-bottom: 12px; }
+.options img { height: 64px; aspect-ratio: auto; }
+.options span { font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
+.selectedBadge { position: absolute; top: 7px; right: 7px; width: 19px; height: 19px; display: grid; place-items: center; border-radius: 50%; background: #9dfff0; color: #08232e; box-shadow: 0 2px 8px #0004; }
+.editActions .upload { background: var(--glass-control); border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+@container (max-width: 290px) {
+  .options { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .modes button { flex-wrap: wrap; gap: 5px; }
+}

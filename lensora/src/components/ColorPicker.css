@@ -1,0 +1,27 @@
+.custom-color-picker { min-width: 0; width: 100%; border: 0; margin: 0; padding: 0; }
+:is(.studio, .video-editor) .color-picker-trigger { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 8px 10px; border-radius: 11px; text-align: left; font-size: 12px; }
+.color-picker-trigger > span:first-child { flex: 1; }
+.color-picker-chip { width: 24px; height: 24px; flex: none; border: 1px solid #ffffff70; border-radius: 7px; box-shadow: inset 0 2px 3px #ffffff40, 0 2px 5px #0005; }
+.color-picker-code { font-size: 10px; color: #b6d6e5; font-variant-numeric: tabular-nums; }
+.color-picker-panel { display: grid; gap: 12px; margin-top: 8px; padding: 12px; border: 1px solid #78bce34d; border-radius: 14px; background: linear-gradient(135deg, #193a4be8, #071622f5); box-shadow: inset 0 1px 0 #dcffff15, 0 10px 24px #0003; }
+.color-picker-presets { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
+:is(.studio, .video-editor) .color-picker-presets button { display: grid; place-items: center; min-width: 0; min-height: 32px; padding: 3px; border-radius: 8px; background: transparent; }
+.color-picker-presets button span { width: 100%; height: 24px; border: 1px solid #ffffff45; border-radius: 5px; background: var(--swatch); box-shadow: inset 0 2px 3px #ffffff30; }
+:is(.studio, .video-editor) .color-picker-presets button[aria-pressed=true] { outline: 2px solid #8bffed; outline-offset: -1px; }
+.color-picker-wheel { position: relative; width: min(100%, 210px); aspect-ratio: 1; margin: 3px auto; border-radius: 50%; background: radial-gradient(circle closest-side, #fff, #fff0), conic-gradient(from 90deg, #f00, #f0f, #00f, #0ff, #0f0, #ff0, #f00); box-shadow: 0 0 0 1px #dfffff40, 0 5px 18px #0005; touch-action: none; cursor: crosshair; }
+.color-picker-wheel::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: #000; opacity: var(--shade); pointer-events: none; }
+.color-wheel-marker { position: absolute; z-index: 1; transform: translate(-50%, -50%); width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 1px #071824, 0 2px 4px #0008; pointer-events: none; }
+.color-picker-range { display: grid; gap: 4px; font-size: 11px; }
+.color-picker-range > span { display: flex; justify-content: space-between; }
+.color-picker-range output { color: #b6fff0; font-variant-numeric: tabular-nums; }
+:is(.studio, .video-editor) .color-picker-range input { appearance: none; -webkit-appearance: none; width: 100%; height: 24px; margin: 0; padding: 0; background: transparent; border: 0; cursor: pointer; }
+.color-picker-range input::-webkit-slider-runnable-track { height: 8px; border-radius: 999px; border: 1px solid #ffffff30; background: linear-gradient(90deg, #000, var(--range-color)); }
+.color-picker-range input::-moz-range-track { height: 6px; border-radius: 999px; border: 1px solid #ffffff30; background: linear-gradient(90deg, #000, var(--range-color)); }
+.color-picker-range input.color-opacity-range::-webkit-slider-runnable-track { background: linear-gradient(90deg, transparent, var(--range-color)), repeating-conic-gradient(#71818b 0% 25%, #263d4a 0% 50%) 0 / 8px 8px; }
+.color-picker-range input.color-opacity-range::-moz-range-track { background: linear-gradient(90deg, transparent, var(--range-color)), repeating-conic-gradient(#71818b 0% 25%, #263d4a 0% 50%) 0 / 8px 8px; }
+.color-picker-range input::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; margin-top: -6px; border: 1px solid #d6fff6; border-radius: 50%; background: radial-gradient(ellipse at 35% 20%, white, #83f2df 45%, #136b71); box-shadow: 0 2px 5px #0008; }
+.color-picker-range input::-moz-range-thumb { width: 16px; height: 16px; border: 1px solid #d6fff6; border-radius: 50%; background: radial-gradient(ellipse at 35% 20%, white, #83f2df 45%, #136b71); box-shadow: 0 2px 5px #0008; }
+.color-picker-hex { display: flex; align-items: center; gap: 10px; font-size: 11px; }
+:is(.studio, .video-editor) .color-picker-hex input { min-width: 0; width: 100%; padding: 8px; border: 1px solid #78bce344; border-radius: 8px; color: #efffff; font-size: 12px; }
+.color-picker-error { color: #ffb9bf; font-size: 11px; }
+.custom-color-picker:disabled .color-picker-wheel { cursor: not-allowed; }

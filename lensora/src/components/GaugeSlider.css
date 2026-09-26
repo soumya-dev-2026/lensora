@@ -1,0 +1,47 @@
+.gauge-control { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; padding: 14px; border: 1px solid #ffffff14; border-radius: 17px; background: linear-gradient(135deg, #ffffff05, #00000012); }
+.gauge-caption { display: grid; gap: 10px; min-width: 0; }
+.gauge-caption label { display: flex; align-items: center; gap: 8px; font-size: 12px; line-height: 1.5; }
+.gauge-caption svg { flex: none; color: #b3ecde; }
+.gauge-hint { color: #94a9b4; font-size: 10px; line-height: 1.5; }
+.gauge-step-buttons { display: flex; gap: 7px; }
+.gauge-step-buttons button { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; background: #ffffff07; }
+.gauge-dial { position: relative; flex: 0 0 180px; width: 180px; height: 180px; touch-action: none; user-select: none; cursor: grab; border-radius: 50%; }
+.gauge-dial:active { cursor: grabbing; }
+.gauge-dial:has(input:focus-visible) { outline: 2px solid #b3ecde; outline-offset: 3px; }
+.gauge-dial > svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.gauge-input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; margin: 0; }
+.gauge-track, .gauge-fill { fill: none; stroke-width: 3; stroke-linecap: round; }
+.gauge-track { stroke: #ffffff18; }
+.gauge-fill { stroke: #b3ecde; transition: stroke-dasharray 140ms ease-out; }
+.gauge-tick { stroke: #ffffff24; stroke-width: 1; }
+.gauge-tick.active { stroke: #b3ecde9c; }
+ .knob-shadow { fill: #060d13; filter: drop-shadow(0 3px 3px #0009); }
+.knob-bevel { stroke: #a8c1cd26; stroke-width: .6; }
+.knob-surface { stroke: #090f15; stroke-width: 1; }
+.knob-rotor { transform-origin: 60px 60px; transition: transform 140ms ease-out; }
+.knob-grip { stroke: #d5e8f024; stroke-width: 1; stroke-linecap: round; }
+.knob-indicator-glow { stroke: #8fe8cc55; stroke-width: 7; stroke-linecap: round; filter: blur(1.5px); }
+.knob-indicator { stroke: #c1ffec; stroke-width: 3; stroke-linecap: round; }
+.knob-center { fill: #14212b3d; stroke: #ffffff06; stroke-width: .5; }
+.gauge-dial:active .knob-rotor, .gauge-dial:active .gauge-fill { transition-duration: 40ms; }
+.gauge-dial:hover .knob-indicator { stroke: #e5fff6; }
+@media (prefers-reduced-motion: reduce) { .gauge-dial .knob-rotor, .gauge-dial .gauge-fill { transition: none; } }
+.gauge-number { fill: #f4f7f8; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.gauge-unit { fill: #a9c6c0; font-size: 10px; font-weight: 400; }
+.gauge-limit { fill: #94a9b4; font-size: 8px; }
+.gauge-control[data-disabled] { opacity: .45; }
+.gauge-control[data-disabled] .gauge-dial, fieldset:disabled .gauge-dial { cursor: not-allowed; }
+@media (max-width: 480px) { .gauge-control { padding: 10px; gap: 8px; flex-wrap: wrap; justify-content: center; } .gauge-caption { flex: 1 1 100px; } .gauge-dial { width: 170px; height: 170px; flex-basis: 170px; } }
+.effect-gauge-pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.effect-gauge-pair .gauge-control { display: grid; justify-items: center; justify-content: stretch; gap: 10px; padding: 12px 8px; text-align: center; }
+.effect-gauge-pair .gauge-caption { display: contents; }
+.effect-gauge-pair .gauge-caption label { grid-row: 1; flex-direction: column; gap: 5px; }
+.effect-gauge-pair .gauge-dial { grid-row: 2; width: min(200px, 100%); height: auto; aspect-ratio: 1; }
+.effect-gauge-pair .gauge-hint { grid-row: 3; }
+.effect-gauge-pair .gauge-step-buttons { grid-row: 4; }
+
+.modal:not(.sidebar):has(.gauge-control) { width: min(540px, calc(100vw - 24px)); }
+@media (max-width: 480px) {
+  .modal:not(.sidebar):has(.gauge-control) { width: calc(100vw - 16px); padding: 14px 10px; }
+  .effect-gauge-pair .gauge-control { padding: 12px 4px; }
+}
