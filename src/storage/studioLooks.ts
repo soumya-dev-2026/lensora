@@ -32,7 +32,7 @@ export function isStudioLook(value: unknown): value is StudioLook {
 export function restoreStudioLook(value: unknown): StudioLook | null {
   if (!object(value) || !object(value.filters) || !object(value.effects)) return null;
   const migrated = { ...value,
-    filters: { look: 'none', lookIntensity: 100, sharpen: 0, ...value.filters },
+    filters: { look: 'none', lookIntensity: 100, sharpen: 0, darkCircles: 0, superBeauty: 0, ...value.filters },
     effects: { vignette: 0, outline: 0, outlineWidth: 4, outlineColor: '#78f5e3', ...value.effects },
   };
   return isStudioLook(migrated) ? migrated : null;

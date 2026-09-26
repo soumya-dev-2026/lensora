@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Mask worker check</title>
+<button id="run">Run mask worker check</button><p id="status" role="status">Ready</p>
+<canvas id="input" width="256" height="144"></canvas>
+<canvas id="output" width="256" height="144"></canvas>
+<script type="module">
+import { AsyncPersonSegmenter } from '/src/ai/AsyncPersonSegmenter.ts';
+import { AsyncFaceTracker } from '/src/ai/AsyncFaceTracker.ts';
+import { WebGLCompositor } from '/src/rendering/WebGLCompositor.ts';
+import { DEFAULT_FILTERS } from '/src/types/filters.ts';
+const status = document.querySelector('#status');
+document.querySelector('#run').onclick = async () => {
+  const segmenter = new AsyncPersonSegmenter();
+  const tracker = new AsyncFaceTracker();
+  const canvas = document.querySelector('#input');
+  const context = canvas.getContext('2d');
+  context.fillStyle = '#aabbaa'; context.fillRect(0, 0, 256, 144);
+  context.fillStyle = '#775544'; context.fillRect(100, 30, 60, 114);
+  status.textContent = 'Loading model…';
+  try {
+    await Promise.all([segmenter.initialize(), tracker.initialize()]);
+    const start = performance.now();
+    let mask;
+    while ((!mask || tracker.completedFrames === 0) && performance.now() - start < 60000) {
+      mask = segmenter.segment(canvas, performance.now());
+      tracker.detect(canvas, performance.now());
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    if (!mask) throw new Error('Mask result timed out');
+    if (!tracker.completedFrames) throw new Error('Face result timed out');
+    const compositor = new WebGLCompositor(document.querySelector('#output'));
+    try {
+      compositor.render(canvas, mask.data, mask.width, mask.height, false, true, 0, 0,
+        { ...DEFAULT_FILTERS, superBeauty: 100, darkCircles: 100 }, mask.regions,
+        { eyes: [[0.43, 0.3, 0.04, 0.07], [0.57, 0.3, 0.04, 0.07]], mask: canvas,
+          pose: { center: [0.5, 0.4], radius: [0.15, 0.25], roll: 0 } });
+      status.textContent = `PASS: worker returned ${mask.width} × ${mask.height} mask (${mask.data.length} pixels); face worker completed ${tracker.completedFrames} frame(s); beauty shader compiled and rendered.`;
+    } finally { compositor.dispose(); }
+  } catch (error) { status.textContent = `FAIL: ${error.message}`; }
+  finally { segmenter.dispose(); tracker.dispose(); }
+};
+</script></html>

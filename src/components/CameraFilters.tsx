@@ -6,8 +6,11 @@ import { GaugeSlider } from './GaugeSlider';
 
 type FilterKey = Exclude<keyof FilterSettings, 'enabled' | 'look'>;
 const beautyControls: { key: FilterKey; label: string; icon: IconName }[] = [
+  { key: 'superBeauty', label: 'Super Beauty', icon: 'sparkle' },
+  { key: 'darkCircles', label: 'Dark circle remover', icon: 'eye' },
   { key: 'skinBrightening', label: 'Skin brightening', icon: 'sun' },
   { key: 'skinSmoothing', label: 'Skin smoothness', icon: 'smooth' },
+  { key: 'eyeMask', label: 'Eye mask', icon: 'mask' },
   { key: 'eyeSize', label: 'Larger eyes', icon: 'eye' },
   { key: 'redLips', label: 'Red lips', icon: 'lips' },
   { key: 'darkHair', label: 'Darker hair', icon: 'hair' },
@@ -49,6 +52,8 @@ export function CameraFilters({ value, onChange, faceState }: {
       </SwipeSlider>
       <div className="filter-gauge"><GaugeSlider id={`filter-${selected.key}`} label={selected.label} icon={selected.icon} disabled={!value.enabled} value={value[selected.key]} min={tab === 'beauty' || selected.key === 'sharpen' ? 0 : -100} suffix={tab === 'beauty' ? '%' : ''} onChange={(next) => onChange({ ...value, [selected.key]: next })} /></div>
       {selected.key === 'whiteBalance' && <p className="muted">Negative values cool the image; positive values add warmth.</p>}
+      {selected.key === 'superBeauty' && <p className="muted">Combines smooth skin, gentle brightening, dark circle reduction, and subtle eye and lip enhancements.</p>}
+      {selected.key === 'darkCircles' && <p className="muted">Softens dark under-eye shadows using your nearby skin tone.</p>}
       {tab === 'beauty' && ['loading', 'error', 'no-face'].includes(faceState) && <p className="muted" role="status">{
         faceState === 'loading' ? 'Preparing face effects…' :
         faceState === 'error' ? 'Face tracking unavailable. Restart the camera to retry.' :

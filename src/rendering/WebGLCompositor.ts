@@ -25,6 +25,9 @@ uniform float u_saturation;
 uniform float u_contrast;
 uniform float u_skinBrightening;
 uniform float u_skinSmoothing;
+uniform float u_darkCircles;
+uniform float u_hasRegions;
+uniform float u_eyeMask;
 uniform float u_eyeSize;
 uniform float u_redLips;
 uniform float u_darkHair;
@@ -78,6 +81,44 @@ vec2 enlargeEye(vec2 uv, vec4 eye) {
   return eye.xy + (uv - eye.xy) * (1.0 - u_eyeSize * 0.07 * falloff);
 }
 
+float eyeMaskStrength(vec2 uv, vec4 eye) {
+  if (u_eyeMask <= 0.0 || eye.z <= 0.0) return 0.0;
+  vec2 delta = uv - eye.xy;
+  vec2 normalized = abs(delta) / max(eye.zw, vec2(0.001));
+  float ellipse = 1.0 - smoothstep(0.8, 1.35, length(normalized));
+  float underEye = 1.0 - smoothstep(0.2, 1.0, max(0.0, delta.y - eye.w * 0.35) / max(eye.w, 0.001));
+  return ellipse * underEye * u_eyeMask;
+}
+
+float faceSkin(vec2 uv) {
+  if (u_hasRegions > 0.5) return smoothstep(0.2, 0.85, texture(u_regions, uv).r);
+  if (u_pose.z <= 0.0 || u_pose.w <= 0.0) return 0.0;
+  vec2 delta = uv - u_pose.xy;
+  float c = cos(u_roll), s = sin(u_roll);
+  vec2 local = vec2(c * delta.x + s * delta.y / u_sourceAspect,
+    -s * delta.x * u_sourceAspect + c * delta.y);
+  return 1.0 - smoothstep(0.7, 1.0, length(local / u_pose.zw));
+}
+
+vec3 reduceDarkCircles(vec3 color, vec2 uv, vec4 eye, float protectedEye) {
+  if (u_darkCircles <= 0.0 || eye.z <= 0.0) return color;
+  vec2 delta = uv - eye.xy;
+  float c = cos(u_roll), s = sin(u_roll);
+  vec2 local = vec2(c * delta.x + s * delta.y / u_sourceAspect,
+    -s * delta.x * u_sourceAspect + c * delta.y) / eye.zw;
+  float underEyeStrength = (1.0 - smoothstep(0.6, 1.35, abs(local.x)))
+    * smoothstep(0.25, 0.65, local.y) * (1.0 - smoothstep(1.1, 1.9, local.y));
+  underEyeStrength *= 1.0 - protectedEye;
+  if (underEyeStrength <= 0.0) return color;
+  vec2 down = vec2(-s * eye.w / u_sourceAspect, c * eye.w);
+  vec3 cheek = texture(u_camera, clamp(eye.xy + down * 2.3, vec2(0.0), vec2(1.0))).rgb;
+  float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+  float cheekLuma = dot(cheek, vec3(0.2126, 0.7152, 0.0722));
+  float lift = clamp(cheekLuma - luma, 0.0, 0.12);
+  vec3 corrected = color + cheek / max(cheekLuma, 0.05) * lift;
+  return mix(color, corrected, underEyeStrength * u_darkCircles * 0.85);
+}
+
 vec3 beautify(vec2 uv) {
   vec3 color = texture(u_camera, uv).rgb;
   if (u_sharpen > 0.0) {
@@ -85,9 +126,15 @@ vec3 beautify(vec2 uv) {
       + texture(u_camera, uv + vec2(0.0, u_cameraTexel.y)).rgb + texture(u_camera, uv - vec2(0.0, u_cameraTexel.y)).rgb) * 0.25;
     color = clamp(color + clamp(color - neighbors, -0.12, 0.12) * u_sharpen * 2.0, 0.0, 1.0);
   }
+  float eyePatch = max(eyeMaskStrength(uv, u_eye0), eyeMaskStrength(uv, u_eye1));
+  if (eyePatch > 0.0) {
+    float darkness = clamp((0.62 - dot(color, vec3(0.299, 0.587, 0.114))) * 1.9, 0.0, 1.0);
+    vec3 skinNeutral = color * vec3(1.24, 1.12, 1.05);
+    color = mix(color, skinNeutral, darkness * eyePatch * 0.7);
+  }
   vec2 regions = texture(u_regions, uv).rg;
   vec3 face = texture(u_faceMask, uv).rgb;
-  float skin = smoothstep(0.2, 0.85, regions.r);
+  float skin = faceSkin(uv);
   float hair = smoothstep(0.2, 0.85, regions.g);
   float protectedDetail = clamp(face.r + face.g + face.b, 0.0, 1.0);
   float skinAmount = skin * (1.0 - protectedDetail);
@@ -103,7 +150,7 @@ vec3 beautify(vec2 uv) {
         vec3 sampleColor = texture(u_camera, sampleUv).rgb;
         vec3 delta = sampleColor - color;
         float weight = exp(-dot(offset, offset) / 4.0 - dot(delta, delta) / 0.008);
-        weight *= smoothstep(0.35, 0.8, texture(u_regions, sampleUv).r);
+        weight *= faceSkin(sampleUv);
         sum += sampleColor * weight;
         total += weight;
       }
@@ -116,13 +163,30 @@ vec3 beautify(vec2 uv) {
   float highlightProtection = 1.0 - smoothstep(0.55, 0.95, skinLight);
   // A small exposure lift preserves skin hue instead of mixing in white.
   color *= 1.0 + 0.14 * u_skinBrightening * skinAmount * highlightProtection;
+  color = reduceDarkCircles(color, uv, u_eye0, face.g);
+  color = reduceDarkCircles(color, uv, u_eye1, face.g);
   // Darken hair while retaining its original shading and strands.
   color *= 1.0 - u_darkHair * hair * 0.3;
+  float eyeMaskValue = 0.0;
+  for (int i = 0; i < 2; i++) {
+    vec4 eye = i == 0 ? u_eye0 : u_eye1;
+    if (eye.z <= 0.0) continue;
+    vec2 relative = (uv - eye.xy) / eye.zw;
+    float radius = length(relative);
+    float underEye = smoothstep(0.9, -0.2, relative.y) * smoothstep(1.4, 0.3, radius);
+    float lowerLid = smoothstep(0.8, -0.5, relative.y) * (1.0 - smoothstep(0.25, 1.0, abs(relative.x)));
+    float eyePatch = max(underEye, lowerLid) * (1.0 - smoothstep(0.8, 1.3, radius));
+    eyeMaskValue = max(eyeMaskValue, eyePatch);
+  }
+  if (eyeMaskValue > 0.0) {
+    vec3 neutralSkin = mix(color, vec3(0.94, 0.82, 0.78), 0.7);
+    color = mix(color, neutralSkin, eyeMaskValue * u_eyeMask * 0.75);
+  }
   float lipLight = dot(color, vec3(0.299, 0.587, 0.114));
-  // Shift the existing lip color gently; preserve its luminance and highlights.
-  vec3 lipstick = color * vec3(1.16, 0.86, 0.93);
+  // Push the lip tone toward a deeper crimson while keeping the original lip shape and brightness.
+  vec3 lipstick = color * vec3(1.9, 0.45, 0.52);
   lipstick *= lipLight / max(dot(lipstick, vec3(0.299, 0.587, 0.114)), 0.001);
-  color = mix(color, lipstick, face.r * u_redLips * 0.55);
+  color = mix(color, lipstick, face.r * u_redLips * 0.8);
   return cameraColor(color);
 }
 
@@ -362,6 +426,13 @@ export class WebGLCompositor {
   private mirrorLocation: WebGLUniformLocation | null;
   private maskPixelLocation: WebGLUniformLocation | null;
   private backgroundTexelLocation: WebGLUniformLocation | null;
+  private lastMask: Uint8Array | null = null;
+  private lastMaskSize = '';
+  private lastRegions: Uint8Array | null = null;
+  private lastRegionsSize = '';
+  private lastFace: FaceFeatures | null | undefined;
+  private emptyRegions = new Uint8Array(2);
+  private emptyFace = new Uint8Array([0, 0, 0, 255]);
 
   constructor(private canvas: HTMLCanvasElement) {
     const gl = canvas.getContext('webgl2', { alpha: false, antialias: false });
@@ -394,7 +465,7 @@ export class WebGLCompositor {
     this.faceTexture = this.createTexture(4, 'u_faceMask');
     this.filterLocations = new Map([
       'brightness', 'whiteBalance', 'saturation', 'contrast', 'skinBrightening',
-      'skinSmoothing', 'eyeSize', 'redLips', 'darkHair', 'cameraTexel', 'eye0', 'eye1',
+      'skinSmoothing', 'darkCircles', 'hasRegions', 'eyeMask', 'eyeSize', 'redLips', 'darkHair', 'cameraTexel', 'eye0', 'eye1',
       'sharpen', 'look', 'lookIntensity', 'vignette', 'outline', 'outlineWidth', 'outlineColor',
       'pose', 'time', 'sourceAspect', 'outputAspect', 'roll', 'weather', 'wave', 'sticker', 'frame', 'spotlight', 'distortion', 'monochrome', 'sepia', 'grain', 'glitch',
     ].map((key) => [key, gl.getUniformLocation(program, `u_${key}`)]));
@@ -510,9 +581,16 @@ export class WebGLCompositor {
     const outlineRgb = [1, 3, 5].map((offset) => parseInt(outlineHex.slice(offset, offset + 2), 16) / 255);
     gl.uniform4f(this.filterLocations.get('outlineColor')!, outlineRgb[0], outlineRgb[1], outlineRgb[2], 1);
     for (const [key, value] of Object.entries(effectValues)) gl.uniform1f(this.filterLocations.get(key)!, value);
-    for (const key of ['brightness', 'whiteBalance', 'saturation', 'contrast', 'skinBrightening', 'skinSmoothing', 'eyeSize', 'redLips', 'darkHair', 'sharpen'] as const) {
-      const needsFace = key === 'eyeSize' || key === 'redLips';
-      gl.uniform1f(this.filterLocations.get(key)!, filters?.enabled && (!needsFace || face) ? (filters[key] ?? 0) / 100 : 0);
+    const superBeauty = filters?.enabled ? (filters.superBeauty ?? 0) : 0;
+    const beautyMix: Partial<Record<keyof CameraFilters, number>> = {
+      skinBrightening: superBeauty * 0.65, skinSmoothing: superBeauty,
+      darkCircles: superBeauty * 0.9, eyeSize: superBeauty * 0.3, redLips: superBeauty * 0.25,
+    };
+    gl.uniform1f(this.filterLocations.get('hasRegions')!, regions ? 1 : 0);
+    for (const key of ['brightness', 'whiteBalance', 'saturation', 'contrast', 'skinBrightening', 'skinSmoothing', 'darkCircles', 'eyeMask', 'eyeSize', 'redLips', 'darkHair', 'sharpen'] as const) {
+      const needsFace = key === 'darkCircles' || key === 'eyeMask' || key === 'eyeSize' || key === 'redLips';
+      const amount = Math.max(filters?.[key] ?? 0, beautyMix[key] ?? -100);
+      gl.uniform1f(this.filterLocations.get(key)!, filters?.enabled && (!needsFace || face) ? amount / 100 : 0);
     }
     gl.uniform2f(this.filterLocations.get('cameraTexel')!, 1 / sourceWidth, 1 / sourceHeight);
     for (let i = 0; i < 2; i++) {
@@ -540,18 +618,30 @@ export class WebGLCompositor {
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, this.maskTexture);
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, maskWidth, maskHeight, 0, gl.RED, gl.UNSIGNED_BYTE, mask);
+    const maskSize = `${maskWidth}x${maskHeight}`;
+    if (mask !== this.lastMask || maskSize !== this.lastMaskSize) {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, maskWidth, maskHeight, 0, gl.RED, gl.UNSIGNED_BYTE, mask);
+      this.lastMask = mask; this.lastMaskSize = maskSize;
+    }
     gl.uniform2f(this.maskPixelLocation,
       Math.min(1, outputAspect / cameraAspect) / width,
       Math.min(1, cameraAspect / outputAspect) / height);
     gl.uniform1i(this.mirrorLocation, mirror ? 1 : 0);
     gl.activeTexture(gl.TEXTURE3);
     gl.bindTexture(gl.TEXTURE_2D, this.regionsTexture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, regions ? maskWidth : 1, regions ? maskHeight : 1, 0, gl.RG, gl.UNSIGNED_BYTE, regions ?? new Uint8Array(2));
+    const regionData = regions ?? this.emptyRegions;
+    const regionSize = regions ? maskSize : '1x1';
+    if (regionData !== this.lastRegions || regionSize !== this.lastRegionsSize) {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG8, regions ? maskWidth : 1, regions ? maskHeight : 1, 0, gl.RG, gl.UNSIGNED_BYTE, regionData);
+      this.lastRegions = regionData; this.lastRegionsSize = regionSize;
+    }
     gl.activeTexture(gl.TEXTURE4);
     gl.bindTexture(gl.TEXTURE_2D, this.faceTexture);
-    if (face) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, face.mask);
-    else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+    if ((face ?? null) !== this.lastFace) {
+      if (face) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, face.mask);
+      else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.emptyFace);
+      this.lastFace = face ?? null;
+    }
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 }

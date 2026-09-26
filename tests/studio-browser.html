@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Studio integration check</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<div id="root"></div>
+<aside style="position:fixed;z-index:99999;left:8px;top:50%;background:#102030;color:white;padding:8px;font:12px monospace;max-width:220px">
+  <button id="start">Start synthetic studio</button><p id="stats" role="status">Synthetic camera and audio. No device permissions needed.</p>
+</aside>
+<script type="module">
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import App from '/src/App.tsx';
+import '/src/index.css';
+document.querySelector('#start').onclick = async (event) => {
+  event.currentTarget.disabled = true;
+  const sources = [document.createElement('canvas'), document.createElement('canvas')];
+  for (const canvas of sources) { canvas.width = 1280; canvas.height = 720; }
+  const audio = new AudioContext();
+  await audio.resume();
+  const oscillator = audio.createOscillator(), gain = audio.createGain(), destination = audio.createMediaStreamDestination();
+  gain.gain.value = 0.02; oscillator.connect(gain).connect(destination); oscillator.start();
+  let tick = 0;
+  const timer = setInterval(() => {
+    for (let i = 0; i < sources.length; i++) {
+      const ctx = sources[i].getContext('2d');
+      ctx.fillStyle = i ? '#17344d' : '#40646a'; ctx.fillRect(0, 0, 1280, 720);
+      ctx.fillStyle = '#d6a780'; ctx.beginPath(); ctx.arc(640 + Math.sin(tick / 30) * 180, 230, 85, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#a8563f'; ctx.fillRect(490 + Math.sin(tick / 30) * 180, 310, 300, 410);
+      ctx.fillStyle = 'white'; ctx.font = '32px sans-serif'; ctx.fillText(`Camera ${i + 1} • frame ${tick}`, 30, 60);
+    }
+    tick++;
+  }, 1000 / 30);
+  Object.defineProperty(navigator.mediaDevices, 'enumerateDevices', { configurable: true, value: async () => [
+    { kind: 'videoinput', deviceId: 'fixture-front', label: 'Front camera', groupId: 'front' },
+    { kind: 'videoinput', deviceId: 'fixture-rear', label: 'Back camera', groupId: 'back' },
+  ] });
+  Object.defineProperty(navigator.mediaDevices, 'getUserMedia', { configurable: true, value: async (constraints) => {
+    if (!constraints.video) return new MediaStream(destination.stream.getAudioTracks().map((track) => track.clone()));
+    const opts = typeof constraints.video === 'object' ? constraints.video : {};
+    const back = JSON.stringify(opts).includes('fixture-rear') || JSON.stringify(opts).includes('environment');
+    const stream = sources[back ? 1 : 0].captureStream(30);
+    const track = stream.getVideoTracks()[0], originalSettings = track.getSettings.bind(track);
+    track.getSettings = () => ({ ...originalSettings(), deviceId: back ? 'fixture-rear' : 'fixture-front', facingMode: back ? 'environment' : 'user' });
+    return stream;
+  } });
+  createRoot(document.querySelector('#root')).render(React.createElement(App));
+  const statsTimer = setInterval(() => {
+    const stats = window.__lensoraPerformance?.snapshot;
+    document.querySelector('#stats').textContent = stats ? `FPS ${stats.fps}; render ${stats.renderMs.toFixed(1)} ms; mask ${stats.maskMs.toFixed(1)} ms; face ${stats.faceMs.toFixed(1)} ms; scale ${stats.renderScale}` : 'Starting…';
+  }, 1000);
+  window.addEventListener('pagehide', () => { clearInterval(timer); clearInterval(statsTimer); oscillator.stop(); void audio.close(); }, { once: true });
+};
+</script></html>

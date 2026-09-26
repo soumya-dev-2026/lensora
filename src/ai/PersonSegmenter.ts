@@ -1,4 +1,5 @@
 import { FilesetResolver, ImageSegmenter } from '@mediapipe/tasks-vision';
+import { loadModel } from './modelCache';
 
 const WASM_ROOT = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm';
 const MODEL_URL =
@@ -61,6 +62,11 @@ export class PersonSegmenter {
   private lastTimestamp = 0;
   private currentMask = new Float32Array(0);
   private currentRegions = new Float32Array(0);
+  // Alternate buffers so the compositor can finish uploading the previous
+  // frame while the next mask is prepared, without allocating every frame.
+  private outputMasks: Uint8Array[] = [];
+  private outputRegions: Uint8Array[] = [];
+  private outputIndex = 0;
   private faceHorizontal = new Float32Array(0);
   private faceExpanded = new Float32Array(0);
   private faceDeque = new Int32Array(0);
@@ -69,16 +75,17 @@ export class PersonSegmenter {
   private maskHeight = 0;
 
   async initialize(): Promise<void> {
-    const vision = await FilesetResolver.forVisionTasks(WASM_ROOT);
+    // Module workers need the ESM loader, which publishes ModuleFactory explicitly.
+    const [vision, model] = await Promise.all([FilesetResolver.forVisionTasks(WASM_ROOT, true), loadModel(MODEL_URL)]);
     this.segmenter = await ImageSegmenter.createFromOptions(vision, {
-      baseOptions: { modelAssetPath: MODEL_URL, delegate: 'GPU' },
+      baseOptions: { modelAssetBuffer: model, delegate: 'GPU' },
       runningMode: 'VIDEO',
       outputCategoryMask: false,
       outputConfidenceMasks: true,
     });
   }
 
-  segment(video: HTMLVideoElement | HTMLCanvasElement, timestamp: number): PersonMask | null {
+  segment(video: HTMLVideoElement | HTMLCanvasElement | ImageBitmap, timestamp: number): PersonMask | null {
     if (!this.segmenter) return null;
 
     let mask: PersonMask | null = null;
@@ -92,6 +99,8 @@ export class PersonSegmenter {
       if (this.currentMask.length !== pixels) {
         this.currentMask = new Float32Array(pixels);
         this.currentRegions = new Float32Array(pixels * 2);
+        this.outputMasks = [new Uint8Array(pixels), new Uint8Array(pixels)];
+        this.outputRegions = [new Uint8Array(pixels * 2), new Uint8Array(pixels * 2)];
         this.faceHorizontal = new Float32Array(pixels);
         this.faceExpanded = new Float32Array(pixels);
       }
@@ -102,7 +111,9 @@ export class PersonSegmenter {
       const currentRegions = this.currentRegions;
       current.fill(0);
       currentRegions.fill(0);
-      const regions = new Uint8Array(current.length * 2);
+      this.outputIndex = 1 - this.outputIndex;
+      const outputMask = this.outputMasks[this.outputIndex];
+      const regions = this.outputRegions[this.outputIndex];
       // Sum only person probabilities, preserving soft boundaries between body
       // parts. Accessory confidence is allowed only close to detected face skin.
       const channels = confidences.map((channel) => channel.getAsFloat32Array());
@@ -140,9 +151,10 @@ export class PersonSegmenter {
         }
       }
       this.lastTimestamp = timestamp;
+      for (let i = 0; i < current.length; i++) outputMask[i] = Math.round(Math.min(1, this.previousMask[i]) * 255);
       for (let i = 0; i < regions.length; i++) regions[i] = Math.round(Math.min(1, this.previousRegions[i]) * 255);
       mask = {
-        data: Uint8Array.from(this.previousMask, (value) => Math.round(value * 255)),
+        data: outputMask,
         regions,
         width: confidence.width,
         height: confidence.height,
@@ -156,6 +168,11 @@ export class PersonSegmenter {
     this.segmenter = null;
     this.previousMask = null;
     this.previousRegions = null;
+    this.currentMask = new Float32Array(0);
+    this.currentRegions = new Float32Array(0);
+    this.outputMasks = [];
+    this.outputRegions = [];
+    this.outputIndex = 0;
     this.lastTimestamp = 0;
     this.maskWidth = 0;
     this.maskHeight = 0;

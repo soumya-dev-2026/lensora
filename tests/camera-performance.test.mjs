@@ -12,6 +12,40 @@ async function load(path, replace = (s) => s) {
   return import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`);
 }
 const { FrameBudget } = await load('../src/rendering/FrameBudget.ts');
+const { AdaptivePreviewQuality, PreviewPerformance } = await load('../src/rendering/PreviewPerformance.ts');
+
+test('mask worker keeps one frame in flight, reuses latest result, and closes late bitmaps', async () => {
+  const oldWorker = globalThis.Worker, oldBitmap = globalThis.createImageBitmap;
+  let worker, resolveBitmap, closed = 0;
+  globalThis.Worker = class {
+    messages = [];
+    constructor() { worker = this; }
+    postMessage(message) { this.messages.push(message); }
+    terminate() { this.terminated = true; }
+  };
+  globalThis.createImageBitmap = () => new Promise((resolve) => { resolveBitmap = resolve; });
+  try {
+    const { AsyncPersonSegmenter } = await load('../src/ai/AsyncPersonSegmenter.ts', (s) =>
+      s.replace("new URL('./segmentation.worker.ts', import.meta.url)", "'worker.js'"));
+    const segmenter = new AsyncPersonSegmenter();
+    const initialized = segmenter.initialize();
+    worker.onmessage({ data: { type: 'ready' } }); await initialized;
+    assert.equal(segmenter.segment({}, 0), null);
+    segmenter.segment({}, 33);
+    resolveBitmap({ close() { closed++; } }); await Promise.resolve();
+    assert.equal(worker.messages.length, 2, 'initialization plus one frame only');
+    segmenter.segment({}, 66);
+    assert.equal(worker.messages.length, 2, 'slow inference does not queue camera frames');
+    const mask = { data: new Uint8Array([255]), width: 1, height: 1 };
+    worker.onmessage({ data: { type: 'mask', mask } });
+    assert.equal(segmenter.segment({}, 100), mask, 'latest result is available without waiting');
+    segmenter.dispose();
+    resolveBitmap({ close() { closed++; } }); await Promise.resolve();
+    assert.equal(closed, 1, 'bitmap created after disposal is released');
+    assert.equal(worker.terminated, true);
+    assert.equal(worker.messages.length, 2);
+  } finally { globalThis.Worker = oldWorker; globalThis.createImageBitmap = oldBitmap; }
+});
 
 test('phone budget processes 15 synchronized frames per second from a 30 fps camera', () => {
   const budget = new FrameBudget(15);
@@ -49,18 +83,18 @@ test('normal preview skips AI; mask is opt-in, pauses while hidden, and cleans u
   };
   globalThis.cancelAnimationFrame = () => {};
   globalThis.previewFixture = {
-    React, FrameBudget,
-    PersonSegmenter: class {
+    React, FrameBudget, AdaptivePreviewQuality, PreviewPerformance,
+    AsyncPersonSegmenter: class {
       initialize() { return new Promise((resolve) => { resolveModel = resolve; }); }
       segment() { segments++; return { data: new Uint8Array([255]), width: 1, height: 1 }; }
       dispose() {}
     },
-    FaceTracker: class { async initialize() { trackers++; } detect() { return null; } dispose() {} },
+    AsyncFaceTracker: class { async initialize() { trackers++; } detect() { return null; } dispose() {} },
     SegmentationInput: class { frame = {}; capture() { return this.frame; } },
     WebGLCompositor: class { setBackgroundColor() {} render() {} dispose() {} },
   };
   const { CameraPreview } = await load('../src/components/CameraPreview.tsx', (s) => `
-    const { React, FrameBudget, PersonSegmenter, FaceTracker, SegmentationInput, WebGLCompositor } = globalThis.previewFixture;
+    const { React, FrameBudget, AdaptivePreviewQuality, PreviewPerformance, AsyncPersonSegmenter, AsyncFaceTracker, SegmentationInput, WebGLCompositor } = globalThis.previewFixture;
     const { useEffect, useRef, useState } = React;
     const styles = new Proxy({}, { get: (_, key) => key });
     const drawLiveImages = () => {}, drawLiveText = () => {};
@@ -71,6 +105,7 @@ test('normal preview skips AI; mask is opt-in, pauses while hidden, and cleans u
     maskEnabled: false, layout: 'portrait', isActive: true, facingMode: 'user', videoRef: { current: video },
     canvasRef: { current: { width: 720, height: 1280, getContext: () => ({ drawImage() {} }) } },
     background: { kind: 'color', value: '#000000' }, onFaceTrackingState() {},
+    filters: { enabled: true },
     onProcessingState: (state) => states.push(state),
   };
   let renderer;
@@ -99,16 +134,16 @@ test('normal preview skips AI; mask is opt-in, pauses while hidden, and cleans u
   assert.equal(renderer.root.findAllByType('video')[0].props.className, 'sourceVideo');
   assert.equal(states.at(-1), 'ready');
   await tick(33);
-  assert.equal(segments, 1);
+  assert.equal(segments, 2, 'masked preview also renders at 30 fps');
   document.hidden = true; events.get('visibilitychange')();
   assert.equal(frames.size, 0);
   document.hidden = false; events.get('visibilitychange')();
   assert.equal(frames.size, 1);
   await tick(1000);
-  assert.equal(segments, 2);
+  assert.equal(segments, 3);
   await act(async () => renderer.update(React.createElement(CameraPreview, props)));
   await tick(1100);
-  assert.equal(segments, 2, 'turning mask off stops inference');
+  assert.equal(segments, 3, 'turning mask off stops inference');
   assert.equal(states.at(-1), 'ready');
   await act(async () => renderer.unmount());
   assert.equal(frames.size, 0);

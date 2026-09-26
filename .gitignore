@@ -30,3 +30,6 @@ dist-ssr
 
 # Local Cloudflare cache
 .wrangler
+
+# Local Android build runtime
+.build-tools/

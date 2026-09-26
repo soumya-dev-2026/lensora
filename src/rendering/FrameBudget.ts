@@ -3,10 +3,10 @@ export class FrameBudget {
   private lastFrame = -Infinity;
   private averageCost = 0;
 
-  constructor(private maxFps: number) {}
+  constructor(private maxFps: number, private headroom = 2) {}
 
   shouldProcess(time: number): boolean {
-    const interval = Math.max(1000 / this.maxFps, this.averageCost * 2);
+    const interval = Math.max(1000 / this.maxFps, this.averageCost * this.headroom);
     if (time - this.lastFrame < interval - 1) return false;
     this.lastFrame = time;
     return true;

@@ -2,17 +2,18 @@ import { drawLiveImages } from '../rendering/liveImages';
 import { LiveImageHandle } from './LiveImageHandle';
 import { useEffect, useRef, useState } from 'react';
 import { CameraPreviewProps } from '../types/camera';
-import { PersonSegmenter } from '../ai/PersonSegmenter';
+import { AsyncPersonSegmenter } from '../ai/AsyncPersonSegmenter';
 import { SegmentationInput } from '../ai/SegmentationInput';
-import { FaceTracker } from '../ai/FaceTracker';
+import { AsyncFaceTracker } from '../ai/AsyncFaceTracker';
 import type { FaceFeatures } from '../types/filters';
 import { WebGLCompositor } from '../rendering/WebGLCompositor';
 import { FrameBudget } from '../rendering/FrameBudget';
+import { AdaptivePreviewQuality, PreviewPerformance } from '../rendering/PreviewPerformance';
 import { drawLiveText } from '../rendering/liveText';
 import { LiveTextHandle } from './LiveTextHandle';
 import styles from './CameraPreview.module.css';
 
-export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, splitCamera = false, maskEnabled = false, liveText, onLiveTextChange, liveImages, onLiveImagesChange, isActive, facingMode, background, blur, tint, filters, effects, comparing = false, onStartCamera, cameraStarting = false, cameraDisabled = false, onFaceTrackingState, onProcessingState }: CameraPreviewProps) {
+export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, splitCamera = false, maskEnabled = false, renderQualityLocked = false, liveText, onLiveTextChange, liveImages, onLiveImagesChange, isActive, facingMode, background, blur, tint, filters, effects, comparing = false, onStartCamera, cameraStarting = false, cameraDisabled = false, onFaceTrackingState, onProcessingState }: CameraPreviewProps) {
   const liveImagesRef = useRef(liveImages);
   liveImagesRef.current = liveImages;
   const liveTextRef = useRef(liveText);
@@ -29,20 +30,24 @@ export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, 
     return () => { original.srcObject = null; };
   }, [comparing, isActive, facingMode, videoRef]);
   const compositorRef = useRef<WebGLCompositor | null>(null);
-  const trackerRef = useRef<FaceTracker | null>(null);
-  const settings = useRef({ background, blur, tint, filters, effects });
-  settings.current = { background, blur, tint, filters, effects };
+  const trackerRef = useRef<AsyncFaceTracker | null>(null);
+  const settings = useRef({ background, blur, tint, filters, effects, renderQualityLocked });
+  settings.current = { background, blur, tint, filters, effects, renderQualityLocked };
   const [generation, setGeneration] = useState(0);
   const [backgroundError, setBackgroundError] = useState<string>();
   const [readyForMask, setReadyForMask] = useState<boolean | null>(null);
   const previewReady = readyForMask === maskEnabled;
+  const beautyNeedsFace = filters.enabled && [filters.superBeauty, filters.darkCircles, filters.skinBrightening,
+    filters.skinSmoothing, filters.eyeMask, filters.eyeSize, filters.redLips].some((amount) => amount > 0);
+  const effectsNeedFace = !!effects?.enabled && (effects.sticker !== 'none' || effects.distortion > 0);
+  const needsFace = maskEnabled || beautyNeedsFace || effectsNeedFace;
 
   useEffect(() => {
     // Track even with beauty disabled: glasses must remain opaque in raw mode.
     // Let the first processed preview appear before loading the second AI model.
-    if (!isActive || !previewReady || !maskEnabled) { onFaceTrackingState('off'); return; }
+    if (!isActive || !previewReady || !needsFace) { onFaceTrackingState('off'); return; }
     let cancelled = false;
-    const tracker = new FaceTracker();
+    const tracker = new AsyncFaceTracker();
     onFaceTrackingState('loading');
     void tracker.initialize().then(() => {
       if (cancelled) { tracker.dispose(); return; }
@@ -57,7 +62,7 @@ export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, 
       trackerRef.current = null;
       tracker.dispose();
     };
-  }, [isActive, previewReady, maskEnabled, onFaceTrackingState]);
+  }, [isActive, previewReady, needsFace, onFaceTrackingState]);
 
   useEffect(() => {
     const compositor = compositorRef.current;
@@ -88,7 +93,10 @@ export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, 
     let frame = 0;
     let usesVideoCallback = false;
     let resumeFrames: (() => void) | undefined;
-    const budget = new FrameBudget(maskEnabled && window.matchMedia('(pointer: coarse)').matches ? 15 : 30);
+    const budget = new FrameBudget(30, 1.1);
+    const quality = new AdaptivePreviewQuality();
+    const metrics = new PreviewPerformance();
+    window.__lensoraPerformance = metrics;
     const sourceVideo = videoRef.current;
     const cancelFrame = () => {
       if (usesVideoCallback) sourceVideo?.cancelVideoFrameCallback(frame);
@@ -100,9 +108,10 @@ export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, 
     };
     document.addEventListener('visibilitychange', visibilityChanged);
     let lastVideoTime = -1;
+    let face: FaceFeatures | null = null;
     const opaqueMask = new Uint8Array([255]);
     let compositor: WebGLCompositor | undefined;
-    const segmenter = maskEnabled ? new PersonSegmenter() : null;
+    const segmenter = maskEnabled ? new AsyncPersonSegmenter() : null;
     const segmentationInput = maskEnabled ? new SegmentationInput() : null;
     onProcessingState?.('loading');
     const fail = (error: unknown) => {
@@ -136,13 +145,14 @@ export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, 
               const started = performance.now();
               lastVideoTime = video.currentTime;
               const mask = segmenter && segmentationInput
-                ? segmenter.segment(segmentationInput.capture(video), time)
+                ? segmenter.segment(() => segmentationInput.capture(video, 256, false), time)
                 : { data: opaqueMask, width: 1, height: 1, regions: undefined };
-              const source = segmentationInput?.frame ?? video;
+              // Render the current camera frame even while a new mask is being inferred.
+              const source = video;
               if (mask) {
                 const effect = settings.current;
-                let face: FaceFeatures | null = null;
                 const tracker = trackerRef.current;
+                if (!tracker) face = null;
                 if (tracker) {
                   try {
                     face = tracker.detect(source, time);
@@ -150,17 +160,20 @@ export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, 
                   } catch {
                     tracker.dispose();
                     trackerRef.current = null;
+                    face = null;
                     onFaceTrackingState('error');
                   }
                 }
                 const canvas = canvasRef.current!;
-                if (scene.width !== canvas.width) scene.width = canvas.width;
-                if (scene.height !== canvas.height) scene.height = canvas.height;
+                const sceneWidth = Math.max(2, Math.round(canvas.width * quality.scale / 2) * 2);
+                const sceneHeight = Math.max(2, Math.round(canvas.height * quality.scale / 2) * 2);
+                if (scene.width !== sceneWidth) scene.width = sceneWidth;
+                if (scene.height !== sceneHeight) scene.height = sceneHeight;
                 const second = secondaryVideoRef?.current;
                 const split = splitSettings.current.splitCamera && second && second.readyState >= 2;
                 const stacked = splitSettings.current.layout === 'portrait';
-                const width = split && !stacked ? canvas.width / 2 : canvas.width;
-                const height = split && stacked ? canvas.height / 2 : canvas.height;
+                const width = split && !stacked ? scene.width / 2 : scene.width;
+                const height = split && stacked ? scene.height / 2 : scene.height;
                 compositor!.render(source, mask.data, mask.width, mask.height, facingMode === 'user', !maskEnabled || effect.background.kind === 'blur', maskEnabled ? effect.blur : 0, maskEnabled ? effect.tint : 0, effect.filters, mask.regions, face, effect.effects, time / 1000,
                   { x: 0, y: split && stacked ? height : 0, width, height });
                 if (split) {
@@ -169,12 +182,17 @@ export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, 
                   compositor!.render(second, opaqueMask, 1, 1, mirror, true, 0, 0, undefined, undefined, null, undefined, time / 1000,
                     { x: stacked ? 0 : width, y: 0, width, height });
                 }
-                context.drawImage(scene, 0, 0);
+                context.drawImage(scene, 0, 0, canvas.width, canvas.height);
                 drawLiveImages(context, liveImagesRef.current, canvas.width, canvas.height);
                 drawLiveText(context, liveTextRef.current, canvas.width, canvas.height);
                 if (!ready) { ready = true; setReadyForMask(maskEnabled); onProcessingState?.('ready'); }
               }
-              budget.recordCost(performance.now() - started);
+              const renderCost = performance.now() - started;
+              budget.recordCost(renderCost);
+              if (mask) {
+                metrics.record(time, renderCost, quality.scale, segmenter?.inferenceMs, trackerRef.current?.inferenceMs);
+                quality.record(time, renderCost, settings.current.renderQualityLocked);
+              }
             }
             scheduleFrame();
           } catch (error) { fail(error); }
@@ -191,6 +209,7 @@ export function CameraPreview({ layout, videoRef, canvasRef, secondaryVideoRef, 
       segmenter?.dispose();
       compositor?.dispose();
       compositorRef.current = null;
+      if (window.__lensoraPerformance === metrics) delete window.__lensoraPerformance;
     };
   }, [isActive, facingMode, maskEnabled, onProcessingState, onFaceTrackingState, videoRef, canvasRef, secondaryVideoRef]);
 

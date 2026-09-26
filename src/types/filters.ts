@@ -9,6 +9,9 @@ export interface CameraFilters {
   contrast: number;
   skinBrightening: number;
   skinSmoothing: number;
+  darkCircles: number;
+  superBeauty: number;
+  eyeMask: number;
   eyeSize: number;
   redLips: number;
   darkHair: number;
@@ -16,7 +19,7 @@ export interface CameraFilters {
 
 export const DEFAULT_FILTERS: CameraFilters = {
   enabled: true, look: 'none', lookIntensity: 100, sharpen: 0, brightness: 0, whiteBalance: 0, saturation: 0, contrast: 0,
-  skinBrightening: 0, skinSmoothing: 0, eyeSize: 0, redLips: 0, darkHair: 0,
+  skinBrightening: 0, skinSmoothing: 0, darkCircles: 0, superBeauty: 0, eyeMask: 0, eyeSize: 0, redLips: 0, darkHair: 0,
 };
 
 export type FaceTrackingState = 'off' | 'loading' | 'tracking' | 'no-face' | 'error';
@@ -24,6 +27,6 @@ export type FaceTrackingState = 'off' | 'loading' | 'tracking' | 'no-face' | 'er
 export interface FaceFeatures {
   // Camera-normalized centers and circular radii, corrected for source aspect.
   eyes: [number, number, number, number][];
-  mask: HTMLCanvasElement;
+  mask: HTMLCanvasElement | OffscreenCanvas | ImageBitmap;
   pose?: { center: [number, number]; radius: [number, number]; roll: number };
 }

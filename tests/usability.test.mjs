@@ -158,7 +158,8 @@ test('record preparation, countdown cancellation, skip, comparison, and saved-lo
   await act(async () => { renderer = Renderer.create(React.createElement(App)); });
   const preview = () => renderer.root.find((node) => node.props.onProcessingState);
   const button = (label) => renderer.root.findByProps({ 'aria-label': label });
-  await act(async () => preview().props.onStartCamera()); assert.equal(cameraStarts, 1);
+  assert.equal(cameraStarts, 0);
+  await env.tick(); assert.equal(cameraStarts, 1);
   active = true;
   await act(async () => renderer.update(React.createElement(App)));
   preview().props.canvasRef.current = { captureStream: () => ({ addTrack() {}, getTracks: () => [] }) };

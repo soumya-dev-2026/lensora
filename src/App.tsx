@@ -137,6 +137,12 @@ function App() {
     try { await startCamera(); }
     finally { startingCamera.current = false; setCameraStarting(false); }
   };
+  useEffect(() => {
+    if (!isSupported || cameraActive.current) return;
+    // Defer until mount settles so StrictMode's setup/cleanup does not request twice.
+    const timer = window.setTimeout(() => { void startPreview(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [isSupported]);
   const cancelRecordingStart = useCallback(() => {
     requestId.current++; recordingRequest.current = false; pendingStart.current = false;
     setRecordingState((current) => current === 'starting' || current === 'countdown' ? 'idle' : current);
@@ -335,7 +341,7 @@ function App() {
 
   return <div className="studio" data-camera-active={isActive} ref={studioRef}>
     <main className="stage" aria-label="Camera studio">
-      <CameraPreview layout={layout} videoRef={videoRef} canvasRef={canvasRef} secondaryVideoRef={secondaryVideoRef} splitCamera={splitCamera} maskEnabled={maskEnabled} liveImages={liveImages} onLiveImagesChange={setLiveImages} liveText={liveText} onLiveTextChange={setLiveText} isActive={isActive} facingMode={facingMode} background={background} blur={blur} tint={tint} filters={filters} effects={effects} comparing={comparing} onStartCamera={() => void startPreview()} cameraStarting={cameraStarting} cameraDisabled={!isSupported || busy} onFaceTrackingState={setFaceState} onProcessingState={handleProcessingState} />
+      <CameraPreview layout={layout} videoRef={videoRef} canvasRef={canvasRef} secondaryVideoRef={secondaryVideoRef} splitCamera={splitCamera} maskEnabled={maskEnabled} renderQualityLocked={recordingState !== 'idle'} liveImages={liveImages} onLiveImagesChange={setLiveImages} liveText={liveText} onLiveTextChange={setLiveText} isActive={isActive} facingMode={facingMode} background={background} blur={blur} tint={tint} filters={filters} effects={effects} comparing={comparing} onStartCamera={() => void startPreview()} cameraStarting={cameraStarting} cameraDisabled={!isSupported || busy} onFaceTrackingState={setFaceState} onProcessingState={handleProcessingState} />
     </main>
     {recordingState === 'countdown' && <RecordingCountdown onComplete={beginRecording} onCancel={cancelRecordingStart} />}
     {isActive && maskEnabled && !splitCamera && processing === 'ready' && recordingState !== 'countdown' && recordingState !== 'starting' && <CompareButton onChange={setComparing} />}
